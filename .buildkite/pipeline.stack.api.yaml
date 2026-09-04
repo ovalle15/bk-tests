@@ -4,6 +4,8 @@ steps:
     command:
       - echo "Preparing dummy environment..."
       - echo "Dependencies installed successfully"
+    checkout:
+      ssh_secret: "MY_SSH_KEY"
 
   - label: ":test_tube: Run tests"
     key: test
