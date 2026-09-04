@@ -1,0 +1,16 @@
+steps:
+  - label: ":hammer: Setup"
+    key: setup
+    command:
+      - echo "Preparing dummy environment..."
+      - echo "Dependencies installed successfully"
+
+  - label: ":test_tube: Run tests"
+    key: test
+    command: echo "Running dummy tests..." && exit 0
+    depends_on: ["setup"]
+
+  - label: ":rocket: Deploy"
+    command: echo "Deploying dummy application..." && exit 0
+    depends_on: ["test"]
+    branches: "main"
