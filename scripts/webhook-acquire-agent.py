@@ -16,7 +16,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-
 def env(name: str, default: str | None = None) -> str | None:
     value = os.environ.get(name)
     return value if value else default
