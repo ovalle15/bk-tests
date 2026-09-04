@@ -8,6 +8,8 @@ import hashlib
 import hmac
 import json
 import os
+from pathlib import Path
+import shlex
 import socket
 import subprocess
 import sys
@@ -84,10 +86,13 @@ def matches_target(payload: dict, queue: str, pipeline_slug: str | None) -> bool
     return bool(job.get("id"))
 
 
-def agent_command(job_id: str, queue: str, image: str) -> list[str]:
+def agent_command(
+    job_id: str, queue: str, image: str,
+    ssh_dir: str | None = None, ssh_key: str | None = None,
+) -> list[str]:
     suffix = job_id.replace("-", "")[:12]
     agent_name = f"{socket.gethostname()}-docker-acquire-{suffix}"
-    return [
+    command = [
         "docker",
         "run",
         "--rm",
@@ -103,6 +108,22 @@ def agent_command(job_id: str, queue: str, image: str) -> list[str]:
         f"BUILDKITE_AGENT_NAME={agent_name}",
         "--env",
         "BUILDKITE_WRITE_JOB_LOGS_TO_STDOUT=true",
+    ]
+    if ssh_dir:
+        command.extend([
+            "--mount",
+            f"type=bind,source={ssh_dir},target=/root/.ssh,readonly",
+            "--env",
+            "BUILDKITE_NO_SSH_KEYSCAN=true",
+        ])
+    if ssh_key:
+        identity = shlex.quote(f"/root/.ssh/{ssh_key}")
+        command.extend([
+            "--env",
+            f"GIT_SSH_COMMAND=ssh -i {identity} -o IdentitiesOnly=yes"
+            " -o BatchMode=yes -o StrictHostKeyChecking=yes",
+        ])
+    command.extend([
         image,
         "start",
         "--acquire-job",
@@ -110,7 +131,8 @@ def agent_command(job_id: str, queue: str, image: str) -> list[str]:
         "--queue",
         queue,
         "--reflect-exit-status",
-    ]
+    ])
+    return command
 
 
 def reap(processes: dict[str, subprocess.Popen]) -> None:
@@ -130,12 +152,38 @@ def parse_args() -> argparse.Namespace:
         help="process matching events already present when the watcher starts",
     )
     parser.add_argument("--dry-run", action="store_true", help="print docker commands only")
+    parser.add_argument(
+        "--ssh-dir",
+        default=env("BUILDKITE_SSH_DIR"),
+        help="host SSH directory containing keys and known_hosts; mounted read-only at /root/.ssh",
+    )
+    parser.add_argument(
+        "--ssh-key",
+        default=env("BUILDKITE_SSH_KEY"),
+        help="private key filename inside --ssh-dir, for example buildkite_spacecamp",
+    )
     parser.add_argument("--poll-interval", type=float, default=float(env("WEBHOOK_POLL_INTERVAL", "2")))
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if args.ssh_dir:
+        ssh_dir = Path(args.ssh_dir).expanduser().resolve()
+        if not ssh_dir.is_dir() or not (ssh_dir / "known_hosts").is_file():
+            print("SSH directory must exist and contain known_hosts", file=sys.stderr)
+            return 2
+        if "," in str(ssh_dir):
+            print("SSH directory path cannot contain commas (Docker mount syntax)", file=sys.stderr)
+            return 2
+        args.ssh_dir = str(ssh_dir)
+    if args.ssh_key:
+        if not args.ssh_dir or Path(args.ssh_key).name != args.ssh_key:
+            print("--ssh-key requires --ssh-dir and a filename without directories", file=sys.stderr)
+            return 2
+        if not (Path(args.ssh_dir) / args.ssh_key).is_file():
+            print("SSH private key file does not exist in SSH directory", file=sys.stderr)
+            return 2
     webhook_token = env("WEBHOOK_SITE_TOKEN")
     agent_token = env("BUILDKITE_AGENT_TOKEN")
     if not webhook_token:
@@ -191,7 +239,7 @@ def main() -> int:
                     continue
 
                 job_id = payload["job"]["id"]
-                command = agent_command(job_id, queue, image)
+                command = agent_command(job_id, queue, image, args.ssh_dir, args.ssh_key)
                 print(f"launching one-shot Docker agent for job {job_id}", flush=True)
                 if args.dry_run:
                     print(" ".join(command), flush=True)
