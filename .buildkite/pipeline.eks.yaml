@@ -1,0 +1,8 @@
+steps:
+  - label: "EKS smoke test"
+    agents:
+      queue: eks
+    command: |
+      echo "Running on EKS"
+      uname -a
+      buildkite-agent --version
