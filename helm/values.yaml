@@ -3,9 +3,3 @@ agentStackSecret: buildkite-agent-token
 config:
   queue: eks
   max-in-flight: 10
-  pod-spec-patch:
-    containers:
-      - name: checkout
-        envFrom:
-          - secretRef:
-              name: buildkite-git-ssh
