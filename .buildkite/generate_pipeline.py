@@ -20,7 +20,7 @@ def generate_pipeline(branch):
                 "key": "record-cluster",
                 "command": 'buildkite-agent meta-data set \
                     "dd_tags.buildkite_cluster_id" \
-                    "$$BUILDKITE_CLUSTER_ID"',
+                    "$BUILDKITE_CLUSTER_ID"',
             })
             
     for suite in suites:
