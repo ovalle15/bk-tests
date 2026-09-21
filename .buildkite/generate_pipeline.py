@@ -4,6 +4,8 @@ import json
 import os
 
 
+
+
 def generate_pipeline(branch):
     # Main runs an extra suite; feature branches get faster feedback.
     suites = ["unit", "integration"]
@@ -21,12 +23,22 @@ def generate_pipeline(branch):
             "command": 'echo "Demo: running $TEST_SUITE tests"',
         })
 
-    steps.append({
-        "label": ":white_check_mark: Summary",
-        "key": "summary",
-        "depends_on": [f"test-{suite}" for suite in suites],
-        "command": 'echo "All generated demo test steps passed"',
-    })
+    steps.extend([
+        {
+            "label":":satellite: Record Buildkite cluster",
+            "key": "record-cluster",
+            "command": 'buildkite-agent meta-data set \
+        "dd_tags.buildkite_cluster_id" \
+        "$$BUILDKITE_CLUSTER_ID"',
+        },
+        {
+            "label": ":white_check_mark: Summary",
+            "key": "summary",
+            "depends_on": [f"test-{suite}" for suite in suites],
+            "command": 'echo "All generated demo test steps passed"',
+        },
+    ])
+
     return {"steps": steps}
 
 
