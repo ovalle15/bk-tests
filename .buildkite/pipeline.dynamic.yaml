@@ -1,0 +1,7 @@
+steps:
+  - label: ":python: Generate pipeline"
+    key: generate-pipeline
+    command: |
+      set -euo pipefail
+      python3 .buildkite/generate_pipeline.py > /tmp/pipeline-"$$BUILDKITE_JOB_ID".json
+      buildkite-agent pipeline upload --no-interpolation /tmp/pipeline-"$$BUILDKITE_JOB_ID".json
