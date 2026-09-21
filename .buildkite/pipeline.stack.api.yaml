@@ -25,3 +25,4 @@ steps:
     command: echo "Deploying dummy application..." && exit 0
     depends_on: ["test"]
     branches: "main"
+
