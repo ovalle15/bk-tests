@@ -1,5 +1,3 @@
-env:
-  BUILDKITE_CLUSTER_ID: "$BUILDKITE_CLUSTER_ID"
 steps:
   - label: ":python: Generate pipeline"
     key: generate-pipeline

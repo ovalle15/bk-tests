@@ -18,9 +18,16 @@ def generate_pipeline(branch):
     steps.append({
                 "label":":satellite: Record Buildkite cluster",
                 "key": "record-cluster",
-                "command": 'buildkite-agent meta-data set \
-                    "dd_tags.buildkite_cluster_id" \
-                    "$BUILDKITE_CLUSTER_ID"',
+                "command": """set -eu
+case "${BUILDKITE_CLUSTER_ID:-}" in
+  ''|*'$'*)
+    echo 'BUILDKITE_CLUSTER_ID is missing or contains a literal variable reference' >&2
+    exit 1
+    ;;
+esac
+buildkite-agent meta-data set "dd_tags.buildkite_cluster_id" "$BUILDKITE_CLUSTER_ID"
+buildkite-agent meta-data get "dd_tags.buildkite_cluster_id"
+""",
             })
             
     for suite in suites:
