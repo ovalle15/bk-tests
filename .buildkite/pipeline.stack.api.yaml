@@ -5,14 +5,17 @@ steps:
       - echo "Preparing dummy environment..."
       - echo "Dependencies installed successfully"
   
-  - label: "Record Buildkite cluster"
+  - label: ":satellite: Record Buildkite cluster"
     key: record-cluster
     command:
       - buildkite-agent meta-data set \
           "dd_tags.buildkite_cluster_id" \
           "$BUILDKITE_CLUSTER_ID"
+  
+  - label: " :bar_chart: Metrics"
+    key: metrics
+    command: buildkite-agent meta-data set "dd_measures.test_count" "42"
     
-
   - label: ":test_tube: Run tests"
     key: test
     command: echo "Running dummy tests..." && exit 0
