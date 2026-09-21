@@ -4,4 +4,11 @@ steps:
     command: |
       set -euo pipefail
       python3 .buildkite/generate_pipeline.py > /tmp/pipeline-"$$BUILDKITE_JOB_ID".json
+      {
+        printf '### Generated dynamic pipeline\n\n'
+        printf 'File on the agent running this job: `/tmp/pipeline-%s.json`\n\n' "$$BUILDKITE_JOB_ID"
+        printf '```json\n'
+        cat /tmp/pipeline-"$$BUILDKITE_JOB_ID".json
+        printf '\n```\n'
+      } | buildkite-agent annotate --context dynamic-pipeline --style info
       buildkite-agent pipeline upload --no-interpolation /tmp/pipeline-"$$BUILDKITE_JOB_ID".json
