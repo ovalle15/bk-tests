@@ -12,7 +12,17 @@ def generate_pipeline(branch):
     if branch == "main":
         suites.append("e2e")
 
+
     steps = []
+
+    steps.append({
+                "label":":satellite: Record Buildkite cluster",
+                "key": "record-cluster",
+                "command": 'buildkite-agent meta-data set \
+                    "dd_tags.buildkite_cluster_id" \
+                    "$$BUILDKITE_CLUSTER_ID"',
+            })
+            
     for suite in suites:
         steps.append({
             "label": f":test_tube: {suite} tests (demo)",
@@ -23,21 +33,14 @@ def generate_pipeline(branch):
             "command": 'echo "Demo: running $TEST_SUITE tests"',
         })
 
-    steps.extend([
-        {
-            "label":":satellite: Record Buildkite cluster",
-            "key": "record-cluster",
-            "command": 'buildkite-agent meta-data set \
-        "dd_tags.buildkite_cluster_id" \
-        "$$BUILDKITE_CLUSTER_ID"',
-        },
+    steps.extend(
         {
             "label": ":white_check_mark: Summary",
             "key": "summary",
             "depends_on": [f"test-{suite}" for suite in suites],
             "command": 'echo "All generated demo test steps passed"',
         },
-    ])
+    )
 
     return {"steps": steps}
 
