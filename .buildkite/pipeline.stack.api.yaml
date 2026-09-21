@@ -14,7 +14,7 @@ steps:
   
   - label: " :bar_chart: Metrics"
     key: metrics
-    command: buildkite-agent meta-data set "dd_measures.test_count" "42"
+    command: buildkite-agent meta-data set "dd_measures.test_count" 42
     
   - label: ":test_tube: Run tests"
     key: test
