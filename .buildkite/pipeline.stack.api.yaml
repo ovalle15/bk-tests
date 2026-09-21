@@ -1,3 +1,7 @@
+env:
+  PIPELINE_VERSION: "1.0.0"
+  ENVIRONMENT: "stage"
+  
 steps:
   - label: ":hammer: Setup"
     key: setup
@@ -25,3 +29,7 @@ steps:
     command: echo "Deploying dummy application..." && exit 0
     depends_on: ["test"]
     branches: "main"
+  
+  - label: ":wave: Finish"
+    command: echo "Pipeline finished successfully. Pipeline version: $PIPELINE_VERSION. Environment: $ENVIRONMENT" && exit 0
+    depends_on: ["deploy"]
