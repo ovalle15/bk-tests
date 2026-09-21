@@ -11,10 +11,10 @@ steps:
   
   - label: ":satellite: Record Buildkite cluster"
     key: record-cluster
-    command:
-      - buildkite-agent meta-data set \
-          "dd_tags.buildkite_cluster_id" \
-          "$BUILDKITE_CLUSTER_ID"
+    command: |
+      buildkite-agent meta-data set \
+        "dd_tags.buildkite_cluster_id" \
+        "$$BUILDKITE_CLUSTER_ID"
   
   - label: " :bar_chart: Metrics"
     key: metrics
@@ -26,10 +26,12 @@ steps:
     depends_on: ["setup"]
 
   - label: ":rocket: Deploy"
+    key: deploy
     command: echo "Deploying dummy application..." && exit 0
     depends_on: ["test"]
     branches: "main"
   
   - label: ":wave: Finish"
-    command: echo "Pipeline finished successfully. Pipeline version: $PIPELINE_VERSION. Environment: $ENVIRONMENT" && exit 0
+    command: |
+      echo "Pipeline finished successfully. Pipeline version: $$PIPELINE_VERSION. Environment: $$ENVIRONMENT"
     depends_on: ["deploy"]
