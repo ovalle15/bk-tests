@@ -1,0 +1,13 @@
+steps:
+  - key: "docker"
+    label: ":docker: Login & Pull app/server"
+    agents:
+      queue: "webhook-acquire"
+    commands:
+      - echo "Logging into bk package registry using OIDC"
+      - buildkite-agent oidc request-token --audience "https://packages.buildkite.com/spacecamp/nasa-image" --lifetime 300 | docker login packages.buildkite.com/spacecamp/nasa-image --username buildkite --password-stdin
+      
+      - echo "Pulling Docker images from bk registry"
+      - docker pull packages.buildkite.com/spacecamp/nasa-image/app:latest
+      - docker pull packages.buildkite.com/spacecamp/nasa-image/server:latest
+
