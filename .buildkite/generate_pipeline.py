@@ -33,7 +33,7 @@ def generate_pipeline(branch):
             "command": 'echo "Demo: running $TEST_SUITE tests"',
         })
 
-    steps.extend(
+    steps.append(
         {
             "label": ":white_check_mark: Summary",
             "key": "summary",
