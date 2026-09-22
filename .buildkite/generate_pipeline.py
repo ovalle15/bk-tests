@@ -28,8 +28,6 @@ def generate_pipeline(branch):
             "label": f":test_tube: {suite} tests (demo)",
             "key": f"test-{suite}",
             "env": {"TEST_SUITE": suite},
-            # --no-interpolation preserves $TEST_SUITE for this job's shell.
-            # Replace this echo with your real test runner.
             "command": 'echo "Demo: running $TEST_SUITE tests"',
         })
 
