@@ -15,13 +15,24 @@ def generate_pipeline(branch):
 
     steps = []
 
-    steps.append({
-                "label":":satellite: Record Buildkite cluster",
-                "key": "record-cluster",
-                "command": """ buildkite-agent meta-data set "dd_tags.buildkite_cluster_id" "$BUILDKITE_CLUSTER_ID"
-                            buildkite-agent meta-data get "dd_tags.buildkite_cluster_id"
-                           """
-            })
+    predefined_steps = [
+        {
+            "label":":satellite: Record Buildkite cluster",
+            "key": "record-cluster",
+            "command": """ buildkite-agent meta-data set "dd_tags.buildkite_cluster_id" "$BUILDKITE_CLUSTER_ID"
+                        buildkite-agent meta-data get "dd_tags.buildkite_cluster_id"
+                       """
+        }, 
+        {
+            "label": ":pipeline: Trigger helm release of nasa image",
+            "key": "trigger-helm-release",
+            "trigger": "ao-deploy"
+        }
+    ]
+    
+    steps.extend(predefined_steps)
+
+    
             
     for suite in suites:
         steps.append({
