@@ -22,11 +22,6 @@ def generate_pipeline(branch):
             "command": """ buildkite-agent meta-data set "dd_tags.buildkite_cluster_id" "$BUILDKITE_CLUSTER_ID"
                         buildkite-agent meta-data get "dd_tags.buildkite_cluster_id"
                        """
-        }, 
-        {
-            "label": ":pipeline: Trigger helm release of nasa image",
-            "key": "trigger-helm-release",
-            "trigger": "ao-deploy"
         }
     ]
     
