@@ -1,0 +1,31 @@
+{
+  "queue_types": {
+    "hosted": {
+      "queue": "macos-med",
+      "environment_override": "BUILDKITE_QUEUE_HOSTED",
+      "description": "Buildkite hosted agents. Set this to the hosted queue key used by the organization."
+    },
+    "self_hosted": {
+      "queue": "kube",
+      "environment_override": "BUILDKITE_QUEUE_SELF_HOSTED",
+      "description": "Self-hosted Kubernetes agents used by the NASA application."
+    }
+  },
+  "workloads": {
+    "record-cluster": {
+      "queue_type": "self_hosted"
+    },
+    "unit": {
+      "queue_type": "self_hosted"
+    },
+    "integration": {
+      "queue_type": "self_hosted"
+    },
+    "e2e": {
+      "queue_type": "self_hosted"
+    },
+    "summary": {
+      "queue_type": "self_hosted"
+    }
+  }
+}
