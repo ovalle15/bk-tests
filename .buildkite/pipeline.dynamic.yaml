@@ -1,9 +1,7 @@
 steps:
   - label: ":mag: Validate queue routing"
     key: validate-queue-routing
-    command: |
-      set -euo pipefail
-      python3 scripts/queue_router.py validate
+    command: python3 scripts/queue_router.py validate
       
   - label: ":python: Generate pipeline"
     key: generate-pipeline
