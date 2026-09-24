@@ -17,3 +17,25 @@ steps:
         printf '\n```\n'
       } | buildkite-agent annotate --context dynamic-pipeline --style info
       buildkite-agent pipeline upload --no-interpolation /tmp/pipeline-"$$BUILDKITE_JOB_ID".json
+
+
+
+#  buildkite-agent pipeline upload --no-interpolation \
+#     /tmp/pipeline-"$$BUILDKITE_JOB_ID".json
+
+  # Breaking it down:
+
+  # - buildkite-agent pipeline upload
+  #   Reads a pipeline file and adds its steps to the current build.
+
+  # - --no-interpolation
+  #   Prevents the upload command from replacing variables such as $TEST_SUITE or
+  #   $BUILDKITE_CLUSTER_ID. Those variables remain in the commands and are
+  #   evaluated later, when each generated job runs.
+
+  # - /tmp/pipeline-...json
+  #   The JSON pipeline produced by scripts/generate_pipeline.py.
+
+  # - $$BUILDKITE_JOB_ID
+  #   Buildkite changes $$ to a literal $ during the first pipeline upload. When
+  #   the generator job runs, the shell expands $BUILDKITE_JOB_ID.
