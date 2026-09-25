@@ -1,6 +1,8 @@
 steps:
   - label: ":python: Generate pipeline"
     key: generate-pipeline
+    agents:
+      queue: "kube"
     command: |
       set -euo pipefail
       python3 scripts/generate_pipeline.py > /tmp/pipeline-"$$BUILDKITE_JOB_ID".json

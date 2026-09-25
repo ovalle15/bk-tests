@@ -26,7 +26,8 @@ def generate_pipeline(branch: str, router: QueueRouter) -> dict:
         {
             "label": ":cat: Validate queue routing",
             "key": "validate-queue-routing",
-            "command": "python3 scripts/queue_router.py validate",
+            "agents": {"queue": router.resolve("record-cluster").queue},
+            "command": "python3 scripts/queue_router.py validate"
         }, 
         {
             "trigger": "ao-deploy",
