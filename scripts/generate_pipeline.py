@@ -32,8 +32,7 @@ def generate_pipeline(branch: str, router: QueueRouter) -> dict:
         {
             "trigger": "ao-deploy",
             "key": "ao-deploy-trigger",
-            "depends_on": ["validate-queue-routing"],
-            "command": "echo 'Triggering ao-deploy pipeline'"
+            "depends_on": ["validate-queue-routing"]
         }
     ]
 
