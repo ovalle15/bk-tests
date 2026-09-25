@@ -37,6 +37,10 @@ specific queue than the default for its type:
 }
 ```
 
+The `deploy` workload controls the queue passed to the triggered `ao-deploy`
+build. That pipeline's bootstrap and uploaded deployment steps both reference
+`${QUEUE}`, so changing the `deploy` route changes the queue end to end.
+
 ## Check routing before committing
 
 ```bash

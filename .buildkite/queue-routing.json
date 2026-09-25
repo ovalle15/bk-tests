@@ -21,6 +21,9 @@
     "integration": {
       "queue_type": "self_hosted"
     },
+    "deploy": {
+      "queue_type": "self_hosted"
+    },
     "e2e": {
       "queue_type": "hosted"
     },

@@ -22,6 +22,7 @@ def config(hosted_queue=None):
             "record-cluster": {"queue_type": "self_hosted"},
             "unit": {"queue_type": "hosted"},
             "integration": {"queue_type": "self_hosted"},
+            "deploy": {"queue_type": "self_hosted", "queue": "deploy-queue"},
             "e2e": {"queue_type": "self_hosted", "queue": "eks"},
             "summary": {"queue_type": "self_hosted"},
         },
@@ -81,7 +82,7 @@ class QueueRouterTests(unittest.TestCase):
         pipeline = generate_pipeline("main", router)
         trigger = next(step for step in pipeline["steps"] if "trigger" in step)
 
-        self.assertEqual(trigger["build"]["env"]["QUEUE"], "kube")
+        self.assertEqual(trigger["build"]["env"]["QUEUE"], "deploy-queue")
         self.assertNotIn("agents", trigger)
 
 
