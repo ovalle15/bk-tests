@@ -22,6 +22,17 @@ def generate_pipeline(branch: str, router: QueueRouter) -> dict:
                 '"$BUILDKITE_CLUSTER_ID"\n'
                 'buildkite-agent meta-data get "dd_tags.buildkite_cluster_id"'
             ),
+        }, 
+        {
+            "label": ":cat: Validate queue routing",
+            "key": "validate-queue-routing",
+            "command": "python3 scripts/queue_router.py validate",
+        }, 
+        {
+            "trigger": "ao-deploy",
+            "key": "ao-deploy-trigger",
+            "depends_on": ["validate-queue-routing"],
+            "command": "echo 'Triggering ao-deploy pipeline'"
         }
     ]
 
@@ -33,6 +44,7 @@ def generate_pipeline(branch: str, router: QueueRouter) -> dict:
                 "agents": {"queue": router.resolve(suite).queue},
                 "env": {"TEST_SUITE": suite},
                 "command": 'echo "Demo: running $TEST_SUITE tests"',
+                "depends_on": ["ao-deploy-trigger"],
             }
         )
 

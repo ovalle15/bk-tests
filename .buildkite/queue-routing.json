@@ -22,7 +22,7 @@
       "queue_type": "self_hosted"
     },
     "e2e": {
-      "queue_type": "self_hosted"
+      "queue_type": "hosted"
     },
     "summary": {
       "queue_type": "self_hosted"

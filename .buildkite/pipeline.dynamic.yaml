@@ -1,13 +1,8 @@
 steps:
-  - label: ":mag: Validate queue routing"
-    key: validate-queue-routing
-    command: python3 scripts/queue_router.py validate
-      
   - label: ":python: Generate pipeline"
     key: generate-pipeline
     command: |
       set -euo pipefail
-      python3 scripts/queue_router.py validate
       python3 scripts/generate_pipeline.py > /tmp/pipeline-"$$BUILDKITE_JOB_ID".json
       {
         printf '### Generated dynamic pipeline\n\n'
