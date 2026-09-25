@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve Buildkite queues by workload and agent-hosting type.
-
-The routing policy lives in .buildkite/queue-routing.json so changing where a
-workload runs does not require changing pipeline-generation code.
-"""
+"""Resolve Buildkite queues for pipelines and generated workloads."""
 
 from __future__ import annotations
 
@@ -19,6 +15,7 @@ from typing import Any, Mapping
 
 DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / ".buildkite" / "queue-routing.json"
 NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+ROUTE_GROUPS = {"pipeline": "pipelines", "workload": "workloads"}
 
 
 class QueueConfigurationError(ValueError):
@@ -27,14 +24,18 @@ class QueueConfigurationError(ValueError):
 
 @dataclass(frozen=True)
 class QueueRoute:
-    workload: str
+    target_kind: str
+    target: str
+    queue_name: str
     queue_type: str
     queue: str
     source: str
 
     def as_dict(self) -> dict[str, str]:
         return {
-            "workload": self.workload,
+            "target_kind": self.target_kind,
+            "target": self.target,
+            "queue_name": self.queue_name,
             "queue_type": self.queue_type,
             "queue": self.queue,
             "source": self.source,
@@ -42,7 +43,7 @@ class QueueRoute:
 
 
 class QueueRouter:
-    """Load, validate, and resolve the queue-routing policy."""
+    """Load, validate, and resolve the shared queue-routing policy."""
 
     def __init__(
         self,
@@ -71,107 +72,115 @@ class QueueRouter:
         return cls(config, environment)
 
     def validate_structure(self) -> None:
-        queue_types = self.config.get("queue_types")
-        workloads = self.config.get("workloads")
-        if not isinstance(queue_types, dict) or not queue_types:
-            raise QueueConfigurationError("queue_types must be a non-empty object")
-        if not isinstance(workloads, dict) or not workloads:
-            raise QueueConfigurationError("workloads must be a non-empty object")
+        queues = self.config.get("queues")
+        if not isinstance(queues, dict) or not queues:
+            raise QueueConfigurationError("queues must be a non-empty object")
 
-        for queue_type, settings in queue_types.items():
-            self._validate_name("queue type", queue_type)
+        for queue_name, settings in queues.items():
+            self._validate_name("queue", queue_name)
             if not isinstance(settings, dict):
                 raise QueueConfigurationError(
-                    f"Queue type {queue_type!r} must be an object"
+                    f"Queue {queue_name!r} must be an object"
                 )
-            queue = settings.get("queue")
-            if queue is not None and (not isinstance(queue, str) or not queue.strip()):
+            queue_key = settings.get("key")
+            if not isinstance(queue_key, str) or not queue_key.strip():
                 raise QueueConfigurationError(
-                    f"Queue type {queue_type!r} has an invalid queue value"
+                    f"Queue {queue_name!r} must have a non-empty key"
+                )
+            queue_type = settings.get("type")
+            if queue_type not in {"hosted", "self_hosted"}:
+                raise QueueConfigurationError(
+                    f"Queue {queue_name!r} must have type 'hosted' or 'self_hosted'"
                 )
             override = settings.get("environment_override")
             if override is not None and (
                 not isinstance(override, str) or not override.strip()
             ):
                 raise QueueConfigurationError(
-                    f"Queue type {queue_type!r} has an invalid environment_override"
+                    f"Queue {queue_name!r} has an invalid environment_override"
                 )
 
-        for workload, settings in workloads.items():
-            self._validate_name("workload", workload)
-            if not isinstance(settings, dict):
+        for group_name in ROUTE_GROUPS.values():
+            routes = self.config.get(group_name)
+            if not isinstance(routes, dict) or not routes:
                 raise QueueConfigurationError(
-                    f"Workload {workload!r} must be an object"
+                    f"{group_name} must be a non-empty object"
                 )
-            queue_type = settings.get("queue_type")
-            if queue_type not in queue_types:
-                raise QueueConfigurationError(
-                    f"Workload {workload!r} references unknown queue type "
-                    f"{queue_type!r}"
-                )
-            queue = settings.get("queue")
-            if queue is not None and (not isinstance(queue, str) or not queue.strip()):
-                raise QueueConfigurationError(
-                    f"Workload {workload!r} has an invalid queue override"
-                )
+            for target, settings in routes.items():
+                self._validate_name(group_name[:-1], target)
+                if not isinstance(settings, dict):
+                    raise QueueConfigurationError(
+                        f"{group_name[:-1].title()} {target!r} must be an object"
+                    )
+                queue_name = settings.get("queue")
+                if queue_name not in queues:
+                    raise QueueConfigurationError(
+                        f"{group_name[:-1].title()} {target!r} references unknown "
+                        f"queue {queue_name!r}"
+                    )
 
     @staticmethod
     def _validate_name(kind: str, name: object) -> None:
         if not isinstance(name, str) or not NAME_PATTERN.fullmatch(name):
             raise QueueConfigurationError(f"Invalid {kind} name: {name!r}")
 
-    def resolve(self, workload: str) -> QueueRoute:
-        workloads = self.config["workloads"]
-        if workload not in workloads:
-            choices = ", ".join(sorted(workloads))
+    @staticmethod
+    def _override_name(target_kind: str, target: str) -> str:
+        normalized_target = re.sub(r"[^A-Z0-9]", "_", target.upper())
+        return f"BUILDKITE_QUEUE_{target_kind.upper()}_{normalized_target}"
+
+    def _resolve(self, target_kind: str, target: str) -> QueueRoute:
+        group_name = ROUTE_GROUPS[target_kind]
+        routes = self.config[group_name]
+        if target not in routes:
+            choices = ", ".join(sorted(routes))
             raise QueueConfigurationError(
-                f"Unknown workload {workload!r}. Configured workloads: {choices}"
+                f"Unknown {target_kind} {target!r}. Configured {group_name}: {choices}"
             )
 
-        workload_settings = workloads[workload]
-        queue_type = workload_settings["queue_type"]
-        type_settings = self.config["queue_types"][queue_type]
+        queue_name = routes[target]["queue"]
+        queue_settings = self.config["queues"][queue_name]
+        queue_key = queue_settings["key"]
+        source = f"{group_name}.{target}.queue"
 
-        # A workload-specific environment variable has highest priority. This
-        # supports temporary rerouting without committing a policy change.
-        workload_override = "BUILDKITE_QUEUE_WORKLOAD_" + re.sub(
-            r"[^A-Z0-9]", "_", workload.upper()
-        )
-        if self.environment.get(workload_override):
-            return QueueRoute(
-                workload, queue_type, self.environment[workload_override], workload_override
-            )
+        # A target-specific override has the highest priority.
+        target_override = self._override_name(target_kind, target)
+        if self.environment.get(target_override):
+            queue_key = self.environment[target_override]
+            source = target_override
+        else:
+            # A catalog-level override reroutes every target using that queue.
+            queue_override = queue_settings.get("environment_override")
+            if queue_override and self.environment.get(queue_override):
+                queue_key = self.environment[queue_override]
+                source = queue_override
 
-        # A queue-type override reroutes every workload of that type together.
-        type_override = type_settings.get("environment_override")
-        if type_override and self.environment.get(type_override):
-            return QueueRoute(
-                workload, queue_type, self.environment[type_override], type_override
-            )
-
-        if workload_settings.get("queue"):
-            return QueueRoute(
-                workload,
-                queue_type,
-                workload_settings["queue"],
-                f"workloads.{workload}.queue",
-            )
-
-        if type_settings.get("queue"):
-            return QueueRoute(
-                workload,
-                queue_type,
-                type_settings["queue"],
-                f"queue_types.{queue_type}.queue",
-            )
-
-        raise QueueConfigurationError(
-            f"No queue is configured for workload {workload!r} (type "
-            f"{queue_type!r}). Set {type_override or 'a queue in the config'}."
+        return QueueRoute(
+            target_kind=target_kind,
+            target=target,
+            queue_name=queue_name,
+            queue_type=queue_settings["type"],
+            queue=queue_key,
+            source=source,
         )
 
-    def resolve_all(self) -> list[QueueRoute]:
-        return [self.resolve(workload) for workload in self.config["workloads"]]
+    def resolve(self, workload: str) -> QueueRoute:
+        """Resolve a workload; retained as the generator's concise API."""
+        return self.resolve_workload(workload)
+
+    def resolve_workload(self, workload: str) -> QueueRoute:
+        return self._resolve("workload", workload)
+
+    def resolve_pipeline(self, pipeline: str) -> QueueRoute:
+        return self._resolve("pipeline", pipeline)
+
+    def resolve_all(self, target_kind: str | None = None) -> list[QueueRoute]:
+        kinds = [target_kind] if target_kind else list(ROUTE_GROUPS)
+        return [
+            self._resolve(kind, target)
+            for kind in kinds
+            for target in self.config[ROUTE_GROUPS[kind]]
+        ]
 
 
 def parse_args() -> argparse.Namespace:
@@ -187,11 +196,17 @@ def parse_args() -> argparse.Namespace:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     resolve_parser = subparsers.add_parser(
-        "resolve", help="print the queue key for one workload"
+        "resolve", help="print the queue key for one pipeline or workload"
     )
-    resolve_parser.add_argument("workload")
+    resolve_parser.add_argument("name")
+    resolve_parser.add_argument(
+        "--kind", choices=sorted(ROUTE_GROUPS), default="workload"
+    )
 
-    subparsers.add_parser("list", help="print all effective workload routes")
+    list_parser = subparsers.add_parser("list", help="print effective routes")
+    list_parser.add_argument(
+        "--kind", choices=["all", *sorted(ROUTE_GROUPS)], default="all"
+    )
     subparsers.add_parser("validate", help="validate every configured route")
     return parser.parse_args()
 
@@ -201,12 +216,23 @@ def main() -> int:
     try:
         router = QueueRouter.from_file(args.config)
         if args.command == "resolve":
-            print(router.resolve(args.workload).queue)
+            route = (
+                router.resolve_pipeline(args.name)
+                if args.kind == "pipeline"
+                else router.resolve_workload(args.name)
+            )
+            print(route.queue)
         elif args.command == "list":
-            print(json.dumps([route.as_dict() for route in router.resolve_all()], indent=2))
+            target_kind = None if args.kind == "all" else args.kind
+            print(
+                json.dumps(
+                    [route.as_dict() for route in router.resolve_all(target_kind)],
+                    indent=2,
+                )
+            )
         else:
             routes = router.resolve_all()
-            print(f"Valid queue routing configuration ({len(routes)} workloads)")
+            print(f"Valid queue routing configuration ({len(routes)} routes)")
     except QueueConfigurationError as error:
         print(f"queue-router: {error}", file=sys.stderr)
         return 2
