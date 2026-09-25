@@ -65,14 +65,24 @@ class QueueRouterTests(unittest.TestCase):
         with self.assertRaisesRegex(QueueConfigurationError, "No queue is configured"):
             router.resolve("unit")
 
-    def test_generated_steps_all_have_an_explicit_queue(self):
+    def test_generated_command_steps_all_have_an_explicit_queue(self):
         router = QueueRouter(config(hosted_queue="hosted-linux"), environment={})
 
         pipeline = generate_pipeline("main", router)
 
         self.assertTrue(pipeline["steps"])
-        for step in pipeline["steps"]:
+        command_steps = [step for step in pipeline["steps"] if "command" in step]
+        for step in command_steps:
             self.assertTrue(step["agents"]["queue"])
+
+    def test_trigger_passes_queue_to_the_triggered_build(self):
+        router = QueueRouter(config(hosted_queue="hosted-linux"), environment={})
+
+        pipeline = generate_pipeline("main", router)
+        trigger = next(step for step in pipeline["steps"] if "trigger" in step)
+
+        self.assertEqual(trigger["build"]["env"]["QUEUE"], "kube")
+        self.assertNotIn("agents", trigger)
 
 
 if __name__ == "__main__":

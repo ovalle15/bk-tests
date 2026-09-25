@@ -32,8 +32,11 @@ def generate_pipeline(branch: str, router: QueueRouter) -> dict:
         {
             "trigger": "ao-deploy",
             "key": "ao-deploy-trigger",
-            "depends_on": ["validate-queue-routing"]
-        }
+            "depends_on": ["validate-queue-routing"],
+            "build": {
+                "env": {"QUEUE": router.resolve("record-cluster").queue},
+            },
+        },
     ]
 
     for suite in suites:
