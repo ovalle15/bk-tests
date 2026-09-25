@@ -76,6 +76,7 @@ class QueueRouter:
         if not isinstance(queues, dict) or not queues:
             raise QueueConfigurationError("queues must be a non-empty object")
 
+        queue_keys: dict[str, str] = {}
         for queue_name, settings in queues.items():
             self._validate_name("queue", queue_name)
             if not isinstance(settings, dict):
@@ -87,6 +88,12 @@ class QueueRouter:
                 raise QueueConfigurationError(
                     f"Queue {queue_name!r} must have a non-empty key"
                 )
+            if queue_key in queue_keys:
+                raise QueueConfigurationError(
+                    f"Queues {queue_keys[queue_key]!r} and {queue_name!r} use the "
+                    f"same key {queue_key!r}"
+                )
+            queue_keys[queue_key] = queue_name
             queue_type = settings.get("type")
             if queue_type not in {"hosted", "self_hosted"}:
                 raise QueueConfigurationError(
@@ -113,11 +120,17 @@ class QueueRouter:
                         f"{group_name[:-1].title()} {target!r} must be an object"
                     )
                 queue_name = settings.get("queue")
-                if queue_name not in queues:
+                if not isinstance(queue_name, str) or not queue_name.strip():
+                    raise QueueConfigurationError(
+                        f"{group_name[:-1].title()} {target!r} must reference a queue"
+                    )
+                try:
+                    self._queue_name_for_reference(queue_name)
+                except QueueConfigurationError as error:
                     raise QueueConfigurationError(
                         f"{group_name[:-1].title()} {target!r} references unknown "
                         f"queue {queue_name!r}"
-                    )
+                    ) from error
 
     @staticmethod
     def _validate_name(kind: str, name: object) -> None:
@@ -129,6 +142,22 @@ class QueueRouter:
         normalized_target = re.sub(r"[^A-Z0-9]", "_", target.upper())
         return f"BUILDKITE_QUEUE_{target_kind.upper()}_{normalized_target}"
 
+    def _queue_name_for_reference(self, queue_reference: object) -> str:
+        """Return the catalog name for either an alias or Buildkite queue key."""
+        queues = self.config["queues"]
+        if queue_reference in queues:
+            return str(queue_reference)
+
+        for queue_name, settings in queues.items():
+            if settings["key"] == queue_reference:
+                return queue_name
+
+        available = sorted({*queues, *(settings["key"] for settings in queues.values())})
+        raise QueueConfigurationError(
+            f"Unknown queue {queue_reference!r}. Available queue names and keys: "
+            f"{', '.join(available)}"
+        )
+
     def _resolve(self, target_kind: str, target: str) -> QueueRoute:
         group_name = ROUTE_GROUPS[target_kind]
         routes = self.config[group_name]
@@ -138,7 +167,7 @@ class QueueRouter:
                 f"Unknown {target_kind} {target!r}. Configured {group_name}: {choices}"
             )
 
-        queue_name = routes[target]["queue"]
+        queue_name = self._queue_name_for_reference(routes[target]["queue"])
         queue_settings = self.config["queues"][queue_name]
         queue_key = queue_settings["key"]
         source = f"{group_name}.{target}.queue"

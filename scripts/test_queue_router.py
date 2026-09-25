@@ -29,12 +29,12 @@ def config():
             },
         },
         "pipelines": {
-            "ao-tests": {"queue": "kubernetes"},
+            "ao-tests": {"queue": "kube"},
             "ao-deploy": {"queue": "deploy-agents"},
         },
         "workloads": {
             "record-cluster": {"queue": "kubernetes"},
-            "unit": {"queue": "hosted-small"},
+            "unit": {"queue": "hosted-linux"},
             "integration": {"queue": "kubernetes"},
             "e2e": {"queue": "eks"},
             "summary": {"queue": "kubernetes"},

@@ -17,6 +17,12 @@
       "type": "hosted",
       "environment_override": "BUILDKITE_QUEUE_MACOS_LARGE",
       "description": "Buildkite hosted macOS large agents."
+    },
+    "default": {
+      "key": "default",
+      "type": "self_hosted",
+      "environment_override": "BUILDKITE_QUEUE_DEFAULT",
+      "description": "The test cluster's default queue."
     }
   },
   "pipelines": {

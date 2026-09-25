@@ -24,7 +24,9 @@ Every usable queue is declared once under `queues`:
 
 The object name, such as `kubernetes`, is a readable routing name. `key` must
 match a queue that already exists in the pipeline's Buildkite cluster. `type`
-documents whether Buildkite or the organization hosts the agents.
+documents whether Buildkite or the organization hosts the agents. Pipeline and
+workload assignments may use either the readable name (`kubernetes`) or the
+real Buildkite key (`kube`).
 
 ## Pipeline assignments
 
