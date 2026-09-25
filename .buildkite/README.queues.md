@@ -28,6 +28,27 @@ documents whether Buildkite or the organization hosts the agents. Pipeline and
 workload assignments may use either the readable name (`kubernetes`) or the
 real Buildkite key (`kube`).
 
+## Agent availability is required
+
+Routing only assigns a job to a queue. It does not create a queue, start an
+agent, or fall back to another queue. Every queue referenced by an active
+pipeline or workload must exist in the same Buildkite cluster and must be able
+to provide an agent:
+
+- A self-hosted queue, such as `kube`, needs a running agent or Agent Stack
+  controller registered to that exact queue key.
+- A hosted queue, such as `macos-med`, must have hosted agents enabled and a
+  valid hosted-agent configuration. Buildkite can provision those agents on
+  demand, so they do not necessarily remain running between jobs.
+
+If no agent is connected or can be provisioned for the selected queue, the job
+stays in the **Scheduled** state. Buildkite will not move it to the cluster's
+default queue.
+
+Before enabling a route, use `queue_router.py list` to identify every queue key
+that needs agent capacity, then confirm those queues in Buildkite under the
+pipeline's cluster.
+
 ## Pipeline assignments
 
 Assign each pipeline to one queue from the catalog:
