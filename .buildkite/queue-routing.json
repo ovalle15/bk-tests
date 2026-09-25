@@ -21,7 +21,7 @@
   },
   "pipelines": {
     "ao-tests": {
-      "queue": "default"
+      "queue": "kube"
     },
     "ao-deploy": {
       "queue": "kube"
