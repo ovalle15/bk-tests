@@ -4,4 +4,4 @@ steps:
       queue: otel-lab
     command: |
       echo "hello from the OTel lab"
-      sleep 3
+      sleep 2
