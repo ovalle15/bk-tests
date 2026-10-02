@@ -4,7 +4,7 @@
       "key": "otel-lab",
       "type": "self_hosted",
       "environment_override": "BUILDKITE_QUEUE_KUBERNETES",
-      "description": "Self-hosted Kubernetes agents used by the NASA application."
+      "description": "Self-hosted Kubernetes agents used by the NASA application, using otel"
     },
     "macos-medium": {
       "key": "macos-med",
