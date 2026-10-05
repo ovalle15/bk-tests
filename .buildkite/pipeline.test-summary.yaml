@@ -1,0 +1,44 @@
+# Standalone test-summary demo. Upload this file from the pipeline's initial step:
+# buildkite-agent pipeline upload .buildkite/pipeline.test-summary.yaml
+# The summary step requires an agent with Docker available.
+steps:
+  - label: ":test_tube: Demo tests (intentional failure)"
+    key: demo-tests
+    command: |
+      set -eu
+      mkdir -p test_results
+      cat > test_results/demo.xml <<'XML'
+      <?xml version="1.0" encoding="UTF-8"?>
+      <testsuite name="Artifact demo" tests="3" failures="1" errors="0" skipped="0" time="0.3">
+        <testcase classname="DemoTests" name="test_homepage" time="0.1"/>
+        <testcase classname="DemoTests" name="test_healthcheck" time="0.1"/>
+        <testcase classname="DemoTests" name="test_checkout" time="0.1">
+          <failure message="Expected HTTP 200, received HTTP 500" type="AssertionError">Checkout returned an internal server error.
+      Expected: 200
+      Actual: 500</failure>
+        </testcase>
+      </testsuite>
+      XML
+      echo "Demo results: 2 passed, 1 failed. Uploading the JUnit report."
+      # Simulate the exit status of a test runner with a failing test.
+      exit 1
+    # Reports are uploaded even when the test command fails.
+    artifact_paths:
+      - "test_results/demo.xml"
+
+  # Run the summary after tests finish, including when tests fail.
+  - wait: ~
+    continue_on_failure: true
+
+  - label: ":bar_chart: Summarize test failures"
+    plugins:
+      - bugcrowd/test-summary#v1.11.0:
+          inputs:
+            - label: "Demo tests"
+              artifact_path: "test_results/demo.xml"
+              type: junit
+          formatter:
+            type: details
+          context: test-summary
+          # Surface plugin execution errors instead of suppressing them.
+          fail_on_error: true
