@@ -1,0 +1,29 @@
+steps:
+  - label: "Build"
+    agents: 
+      queue: "macos-med"
+    command: |
+      # Run the command, show the output live, and save it to a file
+      set -o pipefail
+      make build 2>&1 | tee build.log
+      BUILD_STATUS=$?
+
+      # Keep only the unique deprecation messages
+      grep -i "deprecat" build.log | sort -u > deprecations.log || true
+
+      # Annotate only if any were found
+      if [ -s deprecations.log ]; then
+        COUNT=$(wc -l < deprecations.log | tr -d ' ')
+
+        echo "### $COUNT unique deprecation warnings" > annotation.md
+        echo '```' >> annotation.md
+        cat deprecations.log >> annotation.md
+        echo '```' >> annotation.md
+
+        buildkite-agent annotate --style warning --context deprecations < annotation.md
+        buildkite-agent artifact upload deprecations.log
+      fi
+
+      # Keep the step's original pass or fail result
+      exit $BUILD_STATUS
+

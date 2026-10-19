@@ -1,10 +1,10 @@
 {
   "queues": {
     "kubernetes": {
-      "key": "kube",
+      "key": "otel-lab",
       "type": "self_hosted",
       "environment_override": "BUILDKITE_QUEUE_KUBERNETES",
-      "description": "Self-hosted Kubernetes agents used by the NASA application."
+      "description": "Self-hosted Kubernetes agents used by the NASA application, using otel"
     },
     "macos-medium": {
       "key": "macos-med",
@@ -27,27 +27,27 @@
   },
   "pipelines": {
     "ao-tests": {
-      "queue": "kube"
+      "queue": "otel-lab"
     },
     "ao-deploy": {
-      "queue": "kube"
+      "queue": "otel-lab"
     }
   },
   "workloads": {
     "record-cluster": {
-      "queue": "kube"
+      "queue": "otel-lab"
     },
     "unit": {
       "queue": "default"
     },
     "integration": {
-      "queue": "kube"
+      "queue": "otel-lab"
     },
     "e2e": {
       "queue": "macos-medium"
     },
     "summary": {
-      "queue": "kube"
+      "queue": "otel-lab"
     }
   }
 }
