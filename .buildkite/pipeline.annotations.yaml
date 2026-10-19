@@ -1,7 +1,7 @@
 steps:
   - label: "Build"
     agents: 
-      queue: "macos-md"
+      queue: "macos-med"
     command: |
       # Run the command, show the output live, and save it to a file
       set -o pipefail
