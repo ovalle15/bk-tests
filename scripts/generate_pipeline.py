@@ -47,7 +47,7 @@ def generate_pipeline(branch: str, router: QueueRouter) -> dict:
                 "agents": {"queue": router.resolve(suite).queue},
                 "env": {"TEST_SUITE": suite},
                 "command": 'echo "Demo: running $TEST_SUITE tests"',
-                "depends_on": ["ao-deploy-trigger"],
+                # "depends_on": ["ao-deploy-trigger"],
             }
         )
 
