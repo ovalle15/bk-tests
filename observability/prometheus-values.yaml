@@ -1,0 +1,28 @@
+# prometheus-community/prometheus 29.37.0 (Prometheus 3.15). Accepts remote
+# write from otel-gateway and Tempo's metrics generator.
+
+server:
+  extraFlags:
+    - web.enable-lifecycle
+    - web.enable-remote-write-receiver
+  retention: 7d
+  persistentVolume:
+    enabled: true
+    storageClass: local-path
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+# Not needed for this lab; metrics arrive by remote write.
+alertmanager:
+  enabled: false
+prometheus-pushgateway:
+  enabled: false
+prometheus-node-exporter:
+  enabled: false
+kube-state-metrics:
+  enabled: false

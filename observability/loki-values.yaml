@@ -1,0 +1,75 @@
+# grafana/loki 7.3.0 (Loki 3.6), single binary on the local filesystem.
+# Receives job logs from otel-gateway over OTLP at /otlp.
+
+deploymentMode: SingleBinary
+
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+  schemaConfig:
+    configs:
+      - from: "2026-01-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  compactor:
+    retention_enabled: true
+    delete_request_store: filesystem
+  pattern_ingester:
+    enabled: true
+  limits_config:
+    retention_period: 168h
+    allow_structured_metadata: true
+    volume_enabled: true
+    otlp_config:
+      resource_attributes:
+        # The default index labels include k8s.pod.name and k8s.job.name, which
+        # are unique per Buildkite job under agent-stack-k8s. Index only
+        # low-cardinality resource attributes. The agent sends the Buildkite
+        # fields (pipeline, build, job, queue) as log attributes, which Loki
+        # can only keep as structured metadata, along with trace_id: filter
+        # them with | buildkite_pipeline_slug="..." rather than {...}.
+        ignore_defaults: true
+        attributes_config:
+          - action: index_label
+            attributes:
+              - service.name
+              - k8s.cluster.name
+              - k8s.namespace.name
+
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    storageClass: local-path
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+# Single binary needs none of the scalable components or extras.
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+gateway:
+  enabled: false
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+lokiCanary:
+  enabled: false
+test:
+  enabled: false

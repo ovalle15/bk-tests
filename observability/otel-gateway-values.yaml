@@ -1,0 +1,98 @@
+# open-telemetry/opentelemetry-collector 0.173.1 (collector-contrib 0.160.0),
+# release otel-gateway in namespace otel-lab. The single OTLP entry point for
+# the lab: job pods and agents send here, and the gateway forwards traces to
+# Tempo, logs to Loki and metrics to Prometheus. See observability/README.md.
+
+fullnameOverride: otel-gateway
+mode: deployment
+replicaCount: 1
+
+image:
+  repository: otel/opentelemetry-collector-contrib
+  tag: 0.160.0
+command:
+  name: otelcol-contrib
+
+# Adds the k8s_attributes processor (pod, namespace, job, deployment...) to
+# every pipeline, plus the RBAC it needs to look pods up.
+presets:
+  kubernetesAttributes:
+    enabled: true
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+config:
+  receivers:
+    jaeger: null
+    zipkin: null
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+    prometheus:
+      config:
+        scrape_configs:
+          # agent-stack-k8s controller metrics (job scheduling, stalls,
+          # in-flight limits). The pod declares no ports, so build the address.
+          - job_name: agent-stack-k8s
+            scrape_interval: 30s
+            kubernetes_sd_configs:
+              - role: pod
+                namespaces:
+                  names: [buildkite]
+            relabel_configs:
+              - source_labels: [__meta_kubernetes_pod_label_app]
+                regex: agent-stack-k8s
+                action: keep
+              - source_labels: [__meta_kubernetes_pod_ip]
+                target_label: __address__
+                replacement: $${1}:9216
+              - source_labels: [__meta_kubernetes_pod_name]
+                target_label: pod
+          # The gateway's own telemetry: accepted, refused and exported counts.
+          - job_name: otel-gateway
+            scrape_interval: 30s
+            static_configs:
+              - targets: ["${env:MY_POD_IP}:8888"]
+
+  processors:
+    resource/lab:
+      attributes:
+        - action: upsert
+          key: k8s.cluster.name
+          value: otel-learning
+
+  exporters:
+    # Prints one summary line per batch; raise to detailed to see full payloads.
+    debug:
+      verbosity: basic
+    otlp/tempo:
+      endpoint: tempo.observability.svc.cluster.local:4317
+      tls:
+        insecure: true
+    otlphttp/loki:
+      endpoint: http://loki.observability.svc.cluster.local:3100/otlp
+    prometheus_remote_write:
+      endpoint: http://prometheus-server.observability.svc.cluster.local/api/v1/write
+
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, resource/lab, batch]
+        exporters: [otlp/tempo, debug]
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, resource/lab, batch]
+        exporters: [otlphttp/loki, debug]
+      metrics:
+        receivers: [otlp, prometheus]
+        processors: [memory_limiter, resource/lab, batch]
+        exporters: [prometheus_remote_write, debug]
