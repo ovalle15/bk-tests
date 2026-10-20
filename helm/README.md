@@ -8,6 +8,13 @@ The tracing settings in `values.yaml` and `otel-env.yaml` come from the old
 standalone `buildkite-agent` Deployment, which served the `otel-lab` queue.
 Spans and job logs go to `otel-gateway` in the `otel-lab` namespace.
 
+Job pods run agent v4, which turns tracing on with
+`BUILDKITE_OPENTELEMETRY_TRACING`. The controller's `agent-config.tracing-backend`
+option sets the v3 variable, which v4 ignores, so `values.yaml` sets the v4
+variables directly on the agent container. The checkout and command containers
+each run their own bootstrap, so every job produces two traces, one per
+container, with the same `buildkite.job_id`.
+
 ## Apply
 
 ```sh
