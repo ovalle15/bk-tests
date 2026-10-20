@@ -29,14 +29,14 @@ def generate_pipeline(branch: str, router: QueueRouter) -> dict:
             "agents": {"queue": router.resolve("record-cluster").queue},
             "command": "python3 scripts/queue_router.py validate"
         }, 
-        {
-            "trigger": "ao-deploy",
-            "key": "ao-deploy-trigger",
-            "depends_on": ["validate-queue-routing"],
-            "build": {
-                "env": {"QUEUE": router.resolve_pipeline("ao-deploy").queue},
-            },
-        },
+        # {
+        #     "trigger": "ao-deploy",
+        #     "key": "ao-deploy-trigger",
+        #     "depends_on": ["validate-queue-routing"],
+        #     "build": {
+        #         "env": {"QUEUE": router.resolve_pipeline("ao-deploy").queue},
+        #     },
+        # },
     ]
 
     for suite in suites:
