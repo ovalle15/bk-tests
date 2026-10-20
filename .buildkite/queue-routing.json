@@ -1,5 +1,10 @@
 {
   "queues": {
+    "linux-sm-hosted": {
+      "key": "linux-sm",
+      "type": "hosted",
+      "environment_override": "BUILDKITE_QUEUE_LINUX_HOSTED"
+    },
     "kubernetes": {
       "key": "otel-lab",
       "type": "self_hosted",
@@ -38,16 +43,16 @@
       "queue": "otel-lab"
     },
     "unit": {
-      "queue": "default"
+      "queue": "linux-sm"
     },
     "integration": {
-      "queue": "otel-lab"
+      "queue": "linux-sm"
     },
     "e2e": {
       "queue": "macos-medium"
     },
     "summary": {
-      "queue": "otel-lab"
+      "queue": "linux-sm"
     }
   }
 }
