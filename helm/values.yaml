@@ -1,5 +1,40 @@
-agentStackSecret: buildkite-agent-token
+# Values for the agent-stack-k8s controller (chart 0.50.0, release
+# agent-stack-k8s in namespace buildkite). The agent token is not stored here;
+# upgrade with --reuse-values to keep the agentToken already set on the release.
+# See helm/README.md.
 
 config:
-  queue: eks
+  queue: kube
   max-in-flight: 10
+
+  # Tracing settings carried over from the standalone buildkite-agent Deployment.
+  agent-config:
+    tracing-backend: opentelemetry
+    tracing-service-name: buildkite-agent
+    tracing-propagate-traceparent: true
+
+  # OTLP exporter settings for the bootstrap that runs checkout and commands.
+  default-checkout-params:
+    envFrom:
+      - configMapRef:
+          name: buildkite-otel-env
+  default-command-params:
+    envFrom:
+      - configMapRef:
+          name: buildkite-otel-env
+
+  pod-spec-patch:
+    serviceAccountName: buildkite-agent
+    automountServiceAccountToken: true
+    containers:
+      - name: agent
+        envFrom:
+          - configMapRef:
+              name: buildkite-otel-env
+        env:
+          - name: BUILDKITE_JOB_LOGS_OTLP
+            value: "true"
+          - name: K8S_POD_UID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.uid
