@@ -3,6 +3,14 @@
 # upgrade with --reuse-values to keep the agentToken already set on the release.
 # See helm/README.md.
 
+# Lets the k8s-monitoring Alloy collector find and scrape the controller's
+# Prometheus metrics (its annotation autodiscovery). The job label matches what
+# the Buildkite infrastructure dashboard queries.
+annotations:
+  k8s.grafana.com/scrape: "true"
+  k8s.grafana.com/metrics.portNumber: "9216"
+  k8s.grafana.com/job: buildkite/agent-stack-k8s
+
 config:
   queue: kube
   max-in-flight: 10

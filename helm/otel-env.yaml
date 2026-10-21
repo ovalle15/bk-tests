@@ -4,6 +4,6 @@ metadata:
   name: buildkite-otel-env
   namespace: buildkite
 data:
-  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-gateway.otel-lab.svc.cluster.local:4317
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana-cloud-otel-receiver.monitoring.svc.cluster.local:4317
   OTEL_EXPORTER_OTLP_PROTOCOL: grpc
   OTEL_EXPORTER_OTLP_INSECURE: "true"

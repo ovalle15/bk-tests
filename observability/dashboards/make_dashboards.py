@@ -378,7 +378,7 @@ def infra_dash():
                  PROM, thresholds=OK, desc="Kubernetes Jobs the controller created."), 6, 4, 12)
     d.place(stat("Controller up", prom('max(up{job="buildkite/agent-stack-k8s"})', instant=True), PROM,
                  thresholds=[{"color": "red", "value": None}, {"color": "green", "value": 1}],
-                 desc="1 when otel-gateway can scrape the controller."), 6, 4, 18)
+                 desc="1 when Alloy (k8s-monitoring) can scrape the controller."), 6, 4, 18)
     d.next_line(4)
     d.place(ts("Jobs in flight", [prom("sum(buildkite_deduper_jobs_running)", "running"),
                                   prom("max(buildkite_limiter_max_in_flight)", "max in flight", ref="B"),
@@ -407,30 +407,8 @@ def infra_dash():
                PROM, unit="short"), 12, 7, 12)
     d.next_line(7)
 
-    d.row("Telemetry pipeline (otel-gateway)")
-    d.place(ts("Received per second",
-               [prom("sum(rate(otelcol_receiver_accepted_spans_total[$__rate_interval]))", "spans"),
-                prom("sum(rate(otelcol_receiver_accepted_log_records_total[$__rate_interval]))", "log records", ref="B"),
-                prom("sum(rate(otelcol_receiver_accepted_metric_points_total[$__rate_interval]))", "metric points", ref="C")],
-               PROM, unit="short", desc="What otel-gateway accepted from agents, job pods and scrapes."), 12, 8, 0)
-    d.place(ts("Sent per second, by exporter",
-               [prom("sum by (exporter) (rate(otelcol_exporter_sent_spans_total[$__rate_interval]))", "{{exporter}} spans"),
-                prom("sum by (exporter) (rate(otelcol_exporter_sent_log_records_total[$__rate_interval]))", "{{exporter}} logs", ref="B"),
-                prom("sum by (exporter) (rate(otelcol_exporter_sent_metric_points_total[$__rate_interval]))", "{{exporter}} metrics", ref="C")],
-               PROM, unit="short", desc="Local backends and Grafana Cloud side by side."), 12, 8, 12)
-    d.next_line(8)
-    d.place(ts("Export failures and refusals",
-               [prom("sum by (exporter) (rate(otelcol_exporter_send_failed_spans_total[$__rate_interval]))", "{{exporter}} spans"),
-                prom("sum by (exporter) (rate(otelcol_exporter_send_failed_log_records_total[$__rate_interval]))", "{{exporter}} logs", ref="B"),
-                prom("sum by (exporter) (rate(otelcol_exporter_send_failed_metric_points_total[$__rate_interval]))", "{{exporter}} metrics", ref="C"),
-                prom("sum by (receiver) (rate(otelcol_receiver_refused_spans_total[$__rate_interval]))", "{{receiver}} refused spans", ref="D")],
-               PROM, unit="short", desc="Anything above zero means telemetry is being lost."), 12, 8, 0)
-    d.place(ts("Exporter queue size", [prom("sum by (exporter) (otelcol_exporter_queue_size)", "{{exporter}}")],
-               PROM, unit="short", desc="Batches waiting to be sent. Growth means a backend is slow or down."), 12, 8, 12)
-    d.next_line(8)
-
     return dashboard("buildkite-infra", "Buildkite infrastructure",
-                     "agent-stack-k8s controller health and the otel-gateway telemetry pipeline.", d, [DS_METRICS])
+                     "agent-stack-k8s controller health.", d, [DS_METRICS])
 
 
 if __name__ == "__main__":
