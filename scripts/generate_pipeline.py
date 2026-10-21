@@ -34,6 +34,9 @@ def generate_pipeline(branch: str, router: QueueRouter) -> dict:
             "key": "ao-deploy-trigger",
             "depends_on": ["validate-queue-routing"],
             "build": {
+                # ao-deploy builds a different repo (ao-bk-playground). Without
+                # a branch, the trigger builds that repo's default branch (main).
+                "branch": "ao-deploy",
                 "env": {"QUEUE": router.resolve_pipeline("ao-deploy").queue},
             },
         },

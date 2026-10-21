@@ -110,6 +110,7 @@ class QueueRouterTests(unittest.TestCase):
         trigger = next(step for step in pipeline["steps"] if "trigger" in step)
 
         self.assertEqual(trigger["build"]["env"]["QUEUE"], "deploy-queue")
+        self.assertEqual(trigger["build"]["branch"], "ao-deploy")
         self.assertNotIn("agents", trigger)
 
 
