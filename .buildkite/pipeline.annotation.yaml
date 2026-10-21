@@ -39,4 +39,3 @@ steps:
 
       # Keep the step's original pass or fail result
       exit $$BUILD_STATUS
- 
