@@ -43,16 +43,16 @@
       "queue": "kubernetes"
     },
     "unit": {
-      "queue": "linux-sm"
+      "queue": "kubernetes"
     },
     "integration": {
-      "queue": "linux-sm"
+      "queue": "kubernetes"
     },
     "e2e": {
-      "queue": "macos-medium"
+      "queue": "kubernetes"
     },
     "summary": {
-      "queue": "linux-sm"
+      "queue": "kubernetes"
     }
   }
 }
