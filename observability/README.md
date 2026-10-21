@@ -1,142 +1,110 @@
-# Observability stack
+# Observability
 
-Grafana, Tempo, Loki and Prometheus in the `observability` namespace of the
-rancher-desktop cluster. `otel-gateway` (namespace `otel-lab`) stays the single
-OTLP entry point and forwards each signal here.
+Buildkite telemetry from the rancher-desktop cluster goes to Grafana Cloud.
+`otel-gateway` (namespace `otel-lab`) is the single OTLP entry point: job pods
+and the agent-stack-k8s controller send to it, and it forwards everything to
+the Grafana Cloud stack.
 
 ```
-job pods / agent ──OTLP──▶ otel-gateway (otel-lab)
-                            ├─ traces  ─▶ Tempo       ─┐
-                            ├─ logs    ─▶ Loki         ├─▶ Grafana
-                            └─ metrics ─▶ Prometheus  ─┘
+job pods (agent v4) ──OTLP──▶ otel-gateway (otel-lab) ──OTLP/HTTP──▶ Grafana Cloud
+agent-stack-k8s :9216 ◀─scrape─┘      │                              ├─ traces  (Tempo)
+otel-gateway    :8888 ◀─scrape────────┘                              ├─ logs    (Loki)
+                                                                      └─ metrics (Mimir)
 ```
 
-| Component  | Chart                                  | Values                    | In-cluster address                                  |
-|------------|----------------------------------------|---------------------------|-----------------------------------------------------|
-| Tempo      | `grafana-community/tempo` 3.2.0        | `tempo-values.yaml`       | `tempo.observability:3200` (query), `:4317` (OTLP)  |
-| Loki       | `grafana/loki` 7.3.0                   | `loki-values.yaml`        | `loki.observability:3100`, OTLP at `/otlp`          |
-| Prometheus | `prometheus-community/prometheus` 29.37.0 | `prometheus-values.yaml` | `prometheus-server.observability:80`, remote write at `/api/v1/write` |
-| Grafana    | `grafana-community/grafana` 14.0.1     | `grafana-values.yaml`     | `http://grafana.127.0.0.1.nip.io`                   |
+| What | Where |
+|------|-------|
+| Gateway | Helm release `otel-gateway`, chart `open-telemetry/opentelemetry-collector` 0.173.1, collector-contrib 0.160.0, values in `otel-gateway-values.yaml` |
+| Grafana Cloud stack | Instance `1884458`, region `prod-us-east-2`, endpoint `https://otlp-gateway-prod-us-east-2.grafana.net/otlp` |
+| Credentials | Secret `grafana-cloud-otlp` in `otel-lab`, created by hand, never committed |
+| Dashboards | `dashboards/`, imported into Grafana Cloud |
 
-Each component keeps 7 days of data on a `local-path` volume (5Gi; 1Gi for
-Grafana). Together they request about 1 GiB of memory, with limits of 3.5 GiB.
+How the job pods are configured to send to the gateway is in `helm/README.md`.
 
-## Install
+## Install or update the gateway
+
+Create the credentials Secret first, or the gateway pod won't start:
 
 ```sh
-helm repo add grafana https://grafana.github.io/helm-charts
-helm repo add grafana-community https://grafana-community.github.io/helm-charts
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
-
-kubectl create namespace observability
-
-helm upgrade --install prometheus prometheus-community/prometheus --version 29.37.0 \
-  -n observability -f observability/prometheus-values.yaml
-helm upgrade --install tempo grafana-community/tempo --version 3.2.0 \
-  -n observability -f observability/tempo-values.yaml
-helm upgrade --install loki grafana/loki --version 7.3.0 \
-  -n observability -f observability/loki-values.yaml
-helm upgrade --install grafana grafana-community/grafana --version 14.0.1 \
-  -n observability -f observability/grafana-values.yaml
+read -rs GRAFANA_CLOUD_API_TOKEN   # paste the access policy token; it isn't echoed
+kubectl -n otel-lab create secret generic grafana-cloud-otlp \
+  --from-literal=GRAFANA_CLOUD_INSTANCE_ID=1884458 \
+  --from-literal=GRAFANA_CLOUD_API_TOKEN="$GRAFANA_CLOUD_API_TOKEN"
+unset GRAFANA_CLOUD_API_TOKEN
 ```
 
-Prometheus goes first because Tempo's metrics generator writes to it.
-
-Then point the gateway at the backends:
+The token needs an access policy with `metrics:write`, `logs:write` and
+`traces:write`. Then install or upgrade the gateway:
 
 ```sh
 helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
-helm upgrade otel-gateway open-telemetry/opentelemetry-collector --version 0.173.1 \
+helm upgrade --install otel-gateway open-telemetry/opentelemetry-collector --version 0.173.1 \
   -n otel-lab -f observability/otel-gateway-values.yaml
 ```
 
 `otel-gateway-values.yaml` holds the gateway's whole config, so don't use
-`--reuse-values` with it. Besides OTLP, the gateway scrapes the agent-stack-k8s
-controller (port 9216) and itself (port 8888). In Prometheus those series carry
-`job="buildkite/agent-stack-k8s"` and `job="otel-lab/otelcol-contrib"`.
+`--reuse-values` with it.
 
-## Sign in to Grafana
+**Rotating the token:** create the Secret again with the new token, adding
+`--dry-run=client -o yaml | kubectl apply -f -` to the `create` command, then
+run `kubectl -n otel-lab rollout restart deploy/otel-gateway`. Delete the old
+token in Grafana Cloud afterwards.
 
-Open http://grafana.127.0.0.1.nip.io. Rancher Desktop forwards 127.0.0.1:80 to
-Traefik, and nip.io is public DNS that answers with the address in the name, so
-this works in any browser without editing `/etc/hosts`.
+**The endpoint comes from the stack's region, not the token's.** This token was
+issued in `prod-us-east-0`, but the stack is in `prod-us-east-2`. The
+`prod-us-east-0` gateway accepts the credentials and then returns 502 for every
+request.
 
-Don't use `grafana.localhost`: it resolves to `::1` first, and on this Mac
-Docker Desktop holds `[::1]:80`, so the request never reaches Traefik.
+## What the gateway sends
 
-Without internet DNS, port-forward instead. Port 3000 is already taken on this
-Mac, so use 3300 and bind IPv4 only:
+- **Traces:** one span per job phase (`checkout`, `git.*`, hooks, `command`)
+  and per agent CLI call (`pipeline-upload`, `annotate`, `meta-data-*`). Each
+  carries resource attributes such as `buildkite.pipeline`,
+  `buildkite.build_number`, `buildkite.job_label`, `buildkite.queue` and
+  `buildkite.job_id`, plus Kubernetes attributes added by the gateway.
+- **Logs:** every line of job output, with `trace_id` and the Buildkite fields.
+- **Metrics:** the agent-stack-k8s controller (`job="buildkite/agent-stack-k8s"`,
+  for example `buildkite_limiter_max_in_flight`) and the gateway's own counters
+  (`job="otel-lab/otelcol-contrib"`, `otelcol_*`).
 
-```sh
-kubectl -n observability port-forward --address 127.0.0.1 svc/grafana 3300:80
-```
+Under agent-stack-k8s, each job produces two traces, one for the checkout
+container and one for the command container. Both carry the same
+`buildkite.job_id`.
 
-Then open http://127.0.0.1:3300.
-
-The user is `admin`. The chart generates the password:
-
-```sh
-kubectl -n observability get secret grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo
-```
-
-## How the pieces link up
-
-- **Span to logs:** the Tempo data source queries Loki for
-  `{service_name="buildkite-agent"} | trace_id="<trace>"`. Loki stores the OTLP
-  `trace_id` as structured metadata.
-- **Log to trace:** the Loki data source turns the `trace_id` metadata into a
-  link to Tempo.
-- **Span metrics:** Tempo writes `traces_spanmetrics_*` histograms to Prometheus,
-  labelled by span name, status, `buildkite_pipeline`, `buildkite_job_label`,
-  `buildkite_queue` and `buildkite_branch`. They undercount CI jobs: each new
-  series reaches Prometheus starting at 1, so `increase()` never sees its
-  first job, and a step that is idle for 15 minutes starts a new series. Use
-  them for trends and alerts. The dashboard gets exact counts and averages from
-  TraceQL metrics instead.
-
-Loki indexes only `service_name`, `k8s_cluster_name` and `k8s_namespace_name`.
-The Buildkite fields arrive as log attributes, so Loki keeps them, and
-`trace_id`, as structured metadata. Filter them after the stream selector:
+In Loki, the Buildkite fields are structured metadata, not labels, so filter
+them after the stream selector:
 
 ```logql
-{service_name="buildkite-agent"} | buildkite_pipeline_slug="ao-tests" | buildkite_build_number="86"
+{service_name="buildkite-agent"} | buildkite_pipeline_slug="ao-tests" | buildkite_build_number="88"
 ```
 
-Under agent-stack-k8s, each job produces two traces, one for checkout and one
-for the command container. Both carry the same `buildkite.job_id`.
+## Dashboards
 
-## Buildkite CI dashboard
+Four dashboards, linked to each other from the top-right **Buildkite
+dashboards** menu:
 
-**Dashboards → Buildkite → Buildkite CI**
-(http://grafana.127.0.0.1.nip.io/d/buildkite-ci). Pick pipelines at the top;
-the log search box filters the job logs panel.
+| Dashboard | Use it to | Data |
+|-----------|-----------|------|
+| **Buildkite CI** (`buildkite-ci.json`) | See jobs, failures and where job time goes at a glance | Traces, logs, metrics |
+| **Buildkite logs** (`buildkite-logs.json`) | Find job output: volume by pipeline and step, error lines, lines per job, full-text search | Logs |
+| **Buildkite traces** (`buildkite-traces.json`) | Dig into durations: jobs and failures over time, p95 per step, phase and git timings, sortable job list | Traces |
+| **Buildkite infrastructure** (`buildkite-infra.json`) | Check agent-stack-k8s and otel-gateway health, including what the gateway sends | Metrics |
 
-| Row | Shows | Source |
-|-----|-------|--------|
-| Overview | Jobs run, failed jobs, average command and checkout time, jobs in flight | Tempo (TraceQL metrics), Prometheus |
-| Where job time goes | Average time per phase, p95 of checkout / git fetch / command, runs, time and failures per step | Tempo |
-| Agent CLI overhead | Time spent in `pipeline upload`, `annotate`, `meta-data` and artifact calls | Tempo |
-| Failures | Recent failed traces, and error lines from job logs | Tempo, Loki |
-| Job logs | Every job log line; open a line for its build, job and trace link | Loki |
-| agent-stack-k8s controller | Jobs in flight against the limit, time to create the Kubernetes Job, stalled or failed jobs | Prometheus |
-| Telemetry pipeline | What otel-gateway receives, and any export failures | Prometheus |
+The variables at the top pick the stack's `grafanacloud-<stack>-traces`,
+`-logs` and `-prom` data sources, the pipelines, and on the logs dashboard a
+build number regex, part of a step label and a search string.
 
-Tempo reports quantiles in power-of-two buckets, so the p95 values are
-approximate. Counts and averages are exact. TraceQL metrics queries are allowed
-up to 7 days, the retention.
+Counts and averages from spans use TraceQL metrics, so they're exact. Tempo
+reports quantiles in power-of-two buckets, so p95 values are approximate.
 
-The dashboard is generated by `dashboards/make_dashboard.py` and loaded by
-Grafana's sidecar from a ConfigMap labelled `grafana_dashboard`. It's
-provisioned, so edits in the UI can't be saved over it; change the script
-instead, then:
+### Changing the dashboards
+
+`dashboards/make_dashboards.py` generates all four JSON files. Change the
+script rather than the JSON, then regenerate:
 
 ```sh
-python3 observability/dashboards/make_dashboard.py observability/dashboards/buildkite-ci.json
-kubectl -n observability create configmap grafana-dashboard-buildkite-ci \
-  --from-file=observability/dashboards/buildkite-ci.json --dry-run=client -o yaml \
-  | kubectl label --local -f - grafana_dashboard=1 -o yaml \
-  | kubectl apply -f -
+python3 observability/dashboards/make_dashboards.py observability/dashboards
 ```
 
-Grafana picks up the change within about 30 seconds, without a restart.
+Import each changed file in Grafana Cloud under **Dashboards → New → Import**.
+The `uid` stays the same, so choose to overwrite the existing dashboard.

@@ -1,0 +1,586 @@
+{
+  "uid": "buildkite-traces",
+  "title": "Buildkite traces",
+  "description": "Explore Buildkite job traces in Tempo.",
+  "tags": [
+    "buildkite",
+    "otel"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "ds_traces",
+        "label": "Traces",
+        "type": "datasource",
+        "query": "tempo",
+        "regex": "/-traces$/",
+        "hide": 0,
+        "refresh": 1,
+        "current": {}
+      },
+      {
+        "name": "pipeline",
+        "label": "Pipeline",
+        "type": "query",
+        "datasource": {
+          "type": "tempo",
+          "uid": "${ds_traces}"
+        },
+        "query": {
+          "label": "resource.buildkite.pipeline",
+          "type": 1,
+          "refId": "pipeline"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "Buildkite dashboards",
+      "type": "dashboards",
+      "tags": [
+        "buildkite"
+      ],
+      "asDropdown": true,
+      "includeVars": true,
+      "keepTime": true
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "options": {
+        "mode": "markdown",
+        "content": "Each Buildkite job produces two traces under agent-stack-k8s, one for the checkout container and one for the command container. Both have the job's step as the root span and share `buildkite.job_id`. Click a trace ID to open the trace; from any span, **Logs for this span** opens its job output."
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1
+    },
+    {
+      "type": "row",
+      "title": "Jobs over time",
+      "id": 2,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Jobs by pipeline",
+      "description": "",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "range",
+          "query": "{ name = \"command\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | count_over_time() by (resource.buildkite.pipeline)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*resource\\.buildkite\\.pipeline=\"([^\"]+)\".*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 3
+    },
+    {
+      "type": "timeseries",
+      "title": "Failed jobs by pipeline",
+      "description": "",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "range",
+          "query": "{ name = \"command\" && status = error && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | count_over_time() by (resource.buildkite.pipeline)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*resource\\.buildkite\\.pipeline=\"([^\"]+)\".*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 4
+    },
+    {
+      "type": "row",
+      "title": "Durations",
+      "id": 5,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "p95 command time by step",
+      "description": "Approximate: Tempo buckets durations in powers of two.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "range",
+          "query": "{ name = \"command\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | quantile_over_time(duration, .95) by (resource.buildkite.job_label)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "points",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "pointSize": 6,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*resource\\.buildkite\\.job_label=\"([^\"]+)\".*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "id": 6
+    },
+    {
+      "type": "timeseries",
+      "title": "Average time per phase",
+      "description": "",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "range",
+          "query": "{ name =~ \"checkout|environment|pre-command|command|post-command|pre-exit|artifacts\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | avg_over_time(duration) by (name)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "points",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "pointSize": 6,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*name=\"([^\"]+)\".*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
+      "id": 7
+    },
+    {
+      "type": "bargauge",
+      "title": "Git operations: average time",
+      "description": "Where checkout time goes: fetch, checkout, clean, sparse checkout, commit verification.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name =~ \"git\\\\..*|repo-checkout\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | avg_over_time(duration) by (name)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "min": 0,
+          "noValue": "no data in range",
+          "displayName": "${__series.name}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 22
+      },
+      "id": 8
+    },
+    {
+      "type": "bargauge",
+      "title": "Slowest steps: average command time",
+      "description": "",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"command\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | avg_over_time(duration) by (resource.buildkite.job_label)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "min": 0,
+          "noValue": "no data in range",
+          "displayName": "${__series.name}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 22
+      },
+      "id": 9
+    },
+    {
+      "type": "row",
+      "title": "Find a job",
+      "id": 10,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "panels": []
+    },
+    {
+      "type": "table",
+      "title": "Jobs (command spans)",
+      "description": "One row per job with its duration. Sort by Duration to find the slowest.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "tableType": "spans",
+          "limit": 50,
+          "query": "{ name = \"command\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | select(resource.buildkite.build_number, resource.buildkite.job_label, resource.buildkite.branch)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 31
+      },
+      "id": 11
+    },
+    {
+      "type": "table",
+      "title": "Failed spans",
+      "description": "Every span that ended with an error, with its build and step.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "tableType": "spans",
+          "limit": 50,
+          "query": "{ status = error && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | select(resource.buildkite.build_number, resource.buildkite.job_label)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 31
+      },
+      "id": 12
+    }
+  ]
+}

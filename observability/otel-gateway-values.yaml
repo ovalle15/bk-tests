@@ -1,7 +1,7 @@
 # open-telemetry/opentelemetry-collector 0.173.1 (collector-contrib 0.160.0),
 # release otel-gateway in namespace otel-lab. The single OTLP entry point for
-# the lab: job pods and agents send here, and the gateway forwards traces to
-# Tempo, logs to Loki and metrics to Prometheus. See observability/README.md.
+# the lab: job pods and agents send here, and the gateway forwards traces, logs
+# and metrics to Grafana Cloud. See observability/README.md.
 
 fullnameOverride: otel-gateway
 mode: deployment
@@ -25,6 +25,12 @@ resources:
     memory: 128Mi
   limits:
     memory: 512Mi
+
+# Grafana Cloud credentials (stack instance ID and access policy token).
+# Created by hand, never committed; see observability/README.md.
+extraEnvsFrom:
+  - secretRef:
+      name: grafana-cloud-otlp
 
 config:
   receivers:
@@ -62,6 +68,12 @@ config:
             static_configs:
               - targets: ["${env:MY_POD_IP}:8888"]
 
+  extensions:
+    basicauth/grafana_cloud:
+      client_auth:
+        username: ${env:GRAFANA_CLOUD_INSTANCE_ID}
+        password: ${env:GRAFANA_CLOUD_API_TOKEN}
+
   processors:
     resource/lab:
       attributes:
@@ -73,26 +85,25 @@ config:
     # Prints one summary line per batch; raise to detailed to see full payloads.
     debug:
       verbosity: basic
-    otlp/tempo:
-      endpoint: tempo.observability.svc.cluster.local:4317
-      tls:
-        insecure: true
-    otlphttp/loki:
-      endpoint: http://loki.observability.svc.cluster.local:3100/otlp
-    prometheus_remote_write:
-      endpoint: http://prometheus-server.observability.svc.cluster.local/api/v1/write
+    # Grafana Cloud stack in prod-us-east-2 (the access policy token itself was
+    # issued in prod-us-east-0; the stack's region is what decides the endpoint).
+    otlphttp/grafana_cloud:
+      endpoint: https://otlp-gateway-prod-us-east-2.grafana.net/otlp
+      auth:
+        authenticator: basicauth/grafana_cloud
 
   service:
+    extensions: [health_check, basicauth/grafana_cloud]
     pipelines:
       traces:
         receivers: [otlp]
         processors: [memory_limiter, resource/lab, batch]
-        exporters: [otlp/tempo, debug]
+        exporters: [otlphttp/grafana_cloud, debug]
       logs:
         receivers: [otlp]
         processors: [memory_limiter, resource/lab, batch]
-        exporters: [otlphttp/loki, debug]
+        exporters: [otlphttp/grafana_cloud, debug]
       metrics:
         receivers: [otlp, prometheus]
         processors: [memory_limiter, resource/lab, batch]
-        exporters: [prometheus_remote_write, debug]
+        exporters: [otlphttp/grafana_cloud, debug]

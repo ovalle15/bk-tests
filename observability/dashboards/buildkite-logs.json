@@ -1,0 +1,574 @@
+{
+  "uid": "buildkite-logs",
+  "title": "Buildkite logs",
+  "description": "Explore Buildkite job output in Loki.",
+  "tags": [
+    "buildkite",
+    "otel"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "ds_logs",
+        "label": "Logs",
+        "type": "datasource",
+        "query": "loki",
+        "regex": "/-logs$/",
+        "hide": 0,
+        "refresh": 1,
+        "current": {}
+      },
+      {
+        "name": "ds_traces",
+        "label": "Traces",
+        "type": "datasource",
+        "query": "tempo",
+        "regex": "/-traces$/",
+        "hide": 0,
+        "refresh": 1,
+        "current": {}
+      },
+      {
+        "name": "pipeline",
+        "label": "Pipeline",
+        "type": "query",
+        "datasource": {
+          "type": "tempo",
+          "uid": "${ds_traces}"
+        },
+        "query": {
+          "label": "resource.buildkite.pipeline",
+          "type": 1,
+          "refId": "pipeline"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1
+      },
+      {
+        "name": "build",
+        "label": "Build",
+        "type": "textbox",
+        "query": ".*",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        }
+      },
+      {
+        "name": "step",
+        "label": "Step contains",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "search",
+        "label": "Search",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "Buildkite dashboards",
+      "type": "dashboards",
+      "tags": [
+        "buildkite"
+      ],
+      "asDropdown": true,
+      "includeVars": true,
+      "keepTime": true
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "options": {
+        "mode": "markdown",
+        "content": "Job output from every Buildkite job, sent by the agent over OTLP. Filter with the variables above: **Build** is a regex on the build number (e.g. `88` or `8[5-9]`), **Step contains** matches part of the step label, and **Search** filters the lines in the bottom panel. Open a line's details to see its build, job and `trace_id`; the trace ID links to the job's trace."
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1
+    },
+    {
+      "type": "row",
+      "title": "Volume",
+      "id": 2,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Log lines by pipeline",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "${ds_logs}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${ds_logs}"
+          },
+          "refId": "A",
+          "expr": "sum by (buildkite_pipeline_slug) (count_over_time({service_name=\"buildkite-agent\"} | buildkite_pipeline_slug=~\"${pipeline:regex}\" | buildkite_build_number=~\"${build}\" | buildkite_job_label=~\"(?i).*${step}.*\" [$__auto]))",
+          "legendFormat": "{{buildkite_pipeline_slug}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 3
+    },
+    {
+      "type": "timeseries",
+      "title": "Log lines by step",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "${ds_logs}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${ds_logs}"
+          },
+          "refId": "A",
+          "expr": "sum by (buildkite_job_label) (count_over_time({service_name=\"buildkite-agent\"} | buildkite_pipeline_slug=~\"${pipeline:regex}\" | buildkite_build_number=~\"${build}\" | buildkite_job_label=~\"(?i).*${step}.*\" [$__auto]))",
+          "legendFormat": "{{buildkite_job_label}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 4
+    },
+    {
+      "type": "row",
+      "title": "Errors",
+      "id": 5,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Error lines by pipeline",
+      "description": "Lines matching error, failed, not found, denied or a non-zero exit status.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${ds_logs}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${ds_logs}"
+          },
+          "refId": "A",
+          "expr": "sum by (buildkite_pipeline_slug) (count_over_time({service_name=\"buildkite-agent\"} | buildkite_pipeline_slug=~\"${pipeline:regex}\" | buildkite_build_number=~\"${build}\" | buildkite_job_label=~\"(?i).*${step}.*\" |~ \"(?i)(error|failed|not found|denied|exit status [1-9])\" [$__auto]))",
+          "legendFormat": "{{buildkite_pipeline_slug}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "id": 6
+    },
+    {
+      "type": "logs",
+      "title": "Error lines",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "${ds_logs}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${ds_logs}"
+          },
+          "refId": "A",
+          "expr": "{service_name=\"buildkite-agent\"} | buildkite_pipeline_slug=~\"${pipeline:regex}\" | buildkite_build_number=~\"${build}\" | buildkite_job_label=~\"(?i).*${step}.*\" |~ \"(?i)(error|failed|not found|denied|exit status [1-9])\"",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "prettifyLogMessage": false
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
+      "id": 7
+    },
+    {
+      "type": "row",
+      "title": "Jobs",
+      "id": 8,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "panels": []
+    },
+    {
+      "type": "table",
+      "title": "Log lines per job",
+      "description": "Every job in the range with its line count and error-line count. Sort by a column header.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${ds_logs}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${ds_logs}"
+          },
+          "refId": "A",
+          "expr": "sum by (buildkite_pipeline_slug, buildkite_build_number, buildkite_job_label) (count_over_time({service_name=\"buildkite-agent\"} | buildkite_pipeline_slug=~\"${pipeline:regex}\" | buildkite_build_number=~\"${build}\" | buildkite_job_label=~\"(?i).*${step}.*\" [$__range]))",
+          "legendFormat": "",
+          "queryType": "instant"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${ds_logs}"
+          },
+          "refId": "B",
+          "expr": "sum by (buildkite_pipeline_slug, buildkite_build_number, buildkite_job_label) (count_over_time({service_name=\"buildkite-agent\"} | buildkite_pipeline_slug=~\"${pipeline:regex}\" | buildkite_build_number=~\"${build}\" | buildkite_job_label=~\"(?i).*${step}.*\" |~ \"(?i)(error|failed|not found|denied|exit status [1-9])\" [$__range]))",
+          "legendFormat": "",
+          "queryType": "instant"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "buildkite_pipeline_slug": "Pipeline",
+              "buildkite_build_number": "Build",
+              "buildkite_job_label": "Step",
+              "Value #A": "Lines",
+              "Value #B": "Error lines"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Error lines"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Build",
+            "desc": true
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 22
+      },
+      "id": 9
+    },
+    {
+      "type": "logs",
+      "title": "Exit statuses",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "${ds_logs}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${ds_logs}"
+          },
+          "refId": "A",
+          "expr": "{service_name=\"buildkite-agent\"} | buildkite_pipeline_slug=~\"${pipeline:regex}\" | buildkite_build_number=~\"${build}\" | buildkite_job_label=~\"(?i).*${step}.*\" |~ \"(?i)(exited with status|user command error)\"",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "prettifyLogMessage": false
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 22
+      },
+      "id": 10
+    },
+    {
+      "type": "row",
+      "title": "Search",
+      "id": 11,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "panels": []
+    },
+    {
+      "type": "logs",
+      "title": "Job logs",
+      "description": "All matching job output, newest first.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${ds_logs}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${ds_logs}"
+          },
+          "refId": "A",
+          "expr": "{service_name=\"buildkite-agent\"} | buildkite_pipeline_slug=~\"${pipeline:regex}\" | buildkite_build_number=~\"${build}\" | buildkite_job_label=~\"(?i).*${step}.*\" |= \"$search\"",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "prettifyLogMessage": false
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 12
+    }
+  ]
+}
