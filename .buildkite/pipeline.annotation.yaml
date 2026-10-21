@@ -1,21 +1,34 @@
 steps:
   - label: "Build"
-    agents: 
+    agents:
       queue: "kube"
+    plugins:
+      # The default agent image has no make; this one has make, python3 and git.
+      - kubernetes:
+          podSpec:
+            containers:
+              - image: python:3.12-bookworm
+    artifact_paths:
+      - "build/**/*"
     command: |
-      # Run the command, show the output live, and save it to a file
+      # Shell variables are written $$NAME: pipeline upload turns $$ into $ and
+      # would otherwise replace $NAME with an empty value before the step runs.
+      #
+      # Run the command, show the output live, and save it to a file.
+      # "|| BUILD_STATUS=$$?" keeps the shell's -e from exiting here when the
+      # build fails, so the deprecation annotation still runs.
       set -o pipefail
-      make build 2>&1 | tee build.log
-      BUILD_STATUS=$?
+      BUILD_STATUS=0
+      make build 2>&1 | tee build.log || BUILD_STATUS=$$?
 
       # Keep only the unique deprecation messages
       grep -i "deprecat" build.log | sort -u > deprecations.log || true
 
       # Annotate only if any were found
       if [ -s deprecations.log ]; then
-        COUNT=$(wc -l < deprecations.log | tr -d ' ')
+        COUNT=$$(wc -l < deprecations.log | tr -d ' ')
 
-        echo "### $COUNT unique deprecation warnings" > annotation.md
+        echo "### $$COUNT unique deprecation warnings" > annotation.md
         echo '```' >> annotation.md
         cat deprecations.log >> annotation.md
         echo '```' >> annotation.md
@@ -25,4 +38,4 @@ steps:
       fi
 
       # Keep the step's original pass or fail result
-      exit $BUILD_STATUS
+      exit $$BUILD_STATUS
