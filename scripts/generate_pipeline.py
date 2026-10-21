@@ -9,7 +9,7 @@ from queue_router import QueueRouter
 def generate_pipeline(branch: str, router: QueueRouter) -> dict:
     # Main runs an extra suite; feature branches get faster feedback.
     suites = ["unit", "integration"]
-    if branch == "main":
+    if branch in ["ao-deploy", "main", "ao-tests"]:
         suites.append("e2e")
 
     steps = [
@@ -29,14 +29,14 @@ def generate_pipeline(branch: str, router: QueueRouter) -> dict:
             "agents": {"queue": router.resolve("record-cluster").queue},
             "command": "python3 scripts/queue_router.py validate"
         }, 
-        # {
-        #     "trigger": "ao-deploy",
-        #     "key": "ao-deploy-trigger",
-        #     "depends_on": ["validate-queue-routing"],
-        #     "build": {
-        #         "env": {"QUEUE": router.resolve_pipeline("ao-deploy").queue},
-        #     },
-        # },
+        {
+            "trigger": "ao-deploy",
+            "key": "ao-deploy-trigger",
+            "depends_on": ["validate-queue-routing"],
+            "build": {
+                "env": {"QUEUE": router.resolve_pipeline("ao-deploy").queue},
+            },
+        },
     ]
 
     for suite in suites:
@@ -47,7 +47,7 @@ def generate_pipeline(branch: str, router: QueueRouter) -> dict:
                 "agents": {"queue": router.resolve(suite).queue},
                 "env": {"TEST_SUITE": suite},
                 "command": 'echo "Demo: running $TEST_SUITE tests"',
-                # "depends_on": ["ao-deploy-trigger"],
+                "depends_on": ["ao-deploy-trigger"],
             }
         )
 
