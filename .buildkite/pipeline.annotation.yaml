@@ -11,15 +11,17 @@ steps:
     artifact_paths:
       - "build/**/*"
     command: |
-      # Shell variables are written $$NAME: pipeline upload turns $$ into $ and
-      # would otherwise replace $NAME with an empty value before the step runs.
+      # This runs under /bin/sh (dash in this image), so it sticks to POSIX sh:
+      # no pipefail. Shell variables are written with a doubled dollar sign,
+      # which pipeline upload turns back into one; a single one would be
+      # replaced with an empty value before the step runs.
       #
-      # Run the command, show the output live, and save it to a file.
-      # "|| BUILD_STATUS=$$?" keeps the shell's -e from exiting here when the
+      # Run the build, show the output live, and save it to a file. The build's
+      # exit status is written to build.status, because a pipeline's status is
+      # tee's. "|| status=" also keeps the shell's -e from exiting when the
       # build fails, so the deprecation annotation still runs.
-      set -o pipefail
-      BUILD_STATUS=0
-      make build 2>&1 | tee build.log || BUILD_STATUS=$$?
+      { status=0; make build 2>&1 || status=$$?; echo "$$status" > build.status; } | tee build.log
+      BUILD_STATUS=$$(cat build.status)
 
       # Keep only the unique deprecation messages
       grep -i "deprecat" build.log | sort -u > deprecations.log || true
