@@ -30,6 +30,11 @@ Alloy runs two kinds of configuration side by side:
 | Fleet Management | `ihub_kubernetes_survey_k8s_monitoring` | Beyla workload discovery for Instrumentation Hub |
 | This repo, `k8s-monitoring-values.yaml` | `applicationObservability` feature + `grafanaCloudOtlp` destination | OTLP from applications: the Buildkite job pods' traces and logs |
 
+Fleet Management matches its cluster pipeline to collectors by cluster name
+(`cluster="my-cluster"`), so `cluster.name` in `k8s-monitoring-values.yaml` must
+be the name chosen in the Grafana Cloud onboarding. If they differ, Alloy runs
+but collects no cluster metrics or events.
+
 Fleet Management doesn't offer an OTLP pipeline, which is why that part lives
 in the values file. Alloy polls Fleet Management every 30 seconds, so pipeline
 changes made in Grafana Cloud apply without a redeploy.
