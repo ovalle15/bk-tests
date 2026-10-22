@@ -40,7 +40,9 @@ DS_METRICS = ds_var("ds_metrics", "Metrics", "prometheus", "/-prom$/")
 DS_LOGS = ds_var("ds_logs", "Logs", "loki", "/-logs$/")
 DS_TRACES = ds_var("ds_traces", "Traces", "tempo", "/-traces$/")
 PIPELINE = {"name": "pipeline", "label": "Pipeline", "type": "query", "datasource": TEMPO,
-            "query": {"label": "resource.buildkite.pipeline", "type": 1, "refId": "pipeline"},
+            # Grafana's Tempo data source wants the tag name without its scope
+            # (it looks up "resource" itself); "resource.buildkite.pipeline" finds nothing.
+            "query": {"label": "buildkite.pipeline", "type": 1, "refId": "pipeline"},
             "refresh": 2, "multi": True, "includeAll": True, "allValue": ".*",
             "current": {"text": "All", "value": "$__all"}, "sort": 1}
 
