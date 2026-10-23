@@ -21,6 +21,9 @@ ERR = "(?i)(error|failed|not found|denied|exit status [1-9])"
 
 # TraceQL and LogQL filters shared by the dashboards.
 TP = 'resource.buildkite.pipeline =~ "${pipeline:regex}"'
+# Spans from Buildkite's OpenTelemetry integration (service "buildkite") name the
+# pipeline differently from the agent's spans.
+BP = 'resource.buildkite.pipeline.slug =~ "${pipeline:regex}"'
 PIPELINE_LOGS = '{service_name="buildkite-agent"} | buildkite_pipeline_slug=~"${pipeline:regex}"'
 LOG_SEL = PIPELINE_LOGS + ' | buildkite_build_number=~"${build}" | buildkite_job_label=~"(?i).*${step}.*"'
 
@@ -45,6 +48,10 @@ PIPELINE = {"name": "pipeline", "label": "Pipeline", "type": "query", "datasourc
             "query": {"label": "buildkite.pipeline", "type": 1, "refId": "pipeline"},
             "refresh": 2, "multi": True, "includeAll": True, "allValue": ".*",
             "current": {"text": "All", "value": "$__all"}, "sort": 1}
+# Same variable, listing pipelines from Buildkite's OpenTelemetry integration, which
+# covers every pipeline it's enabled for (not only those on kube). Same slugs, so the
+# agent-based panels filter correctly too.
+PIPELINE_ALL = {**PIPELINE, "query": {"label": "buildkite.pipeline.slug", "type": 1, "refId": "pipeline"}}
 
 
 def textbox(name, label, default):
@@ -192,7 +199,58 @@ def dashboard(uid, title, desc, d, variables, time_from="now-6h"):
 
 def ci():
     d = Dash()
-    d.row("Overview")
+    d.row("Builds and queue wait (Buildkite OpenTelemetry integration)")
+    d.place(text("From Buildkite's **OpenTelemetry notification service**, which sends build, step and job "
+                 "spans (`buildkite.build`, `buildkite.job` …) from Buildkite itself, for every queue. These "
+                 "panels stay empty until it's enabled under **Organization settings → Notification Services**. "
+                 "The rows below come from the agent inside each job pod on `kube`."), 24, 2, 0)
+    d.next_line(2)
+    d.place(tstat("Builds finished", f'{{ name = "buildkite.build" && {BP} }} | count_over_time()',
+                  desc="One `buildkite.build` span per build.", thresholds=OK), 4, 4, 0)
+    d.place(tstat("Failed builds",
+                  f'{{ name = "buildkite.build" && span.buildkite.build.state = "failed" && {BP} }} | count_over_time()',
+                  desc="Builds that finished in the `failed` state.", thresholds=BAD), 4, 4, 4)
+    d.place(tstat("Avg build duration", f'{{ name = "buildkite.build" && {BP} }} | avg_over_time(duration)',
+                  unit="s", decimals=1, desc="Average length of the `buildkite.build` span."), 4, 4, 8)
+    d.place(tstat("Avg queue wait",
+                  f'{{ name = "buildkite.job" && {BP} }} | avg_over_time(span.buildkite.job.wait_time_ms)',
+                  unit="ms", decimals=0, desc="Time jobs waited to be picked up by an agent (`buildkite.job.wait_time_ms`)."),
+            4, 4, 12)
+    d.place(tstat("p95 queue wait",
+                  f'{{ name = "buildkite.job" && {BP} }} | quantile_over_time(span.buildkite.job.wait_time_ms, .95)',
+                  unit="ms", decimals=0, desc="95th percentile of job queue wait. Approximate: Tempo buckets values."),
+            4, 4, 16)
+    d.place(tstat("Retried jobs",
+                  f'{{ name = "buildkite.job" && span.buildkite.job.retries_count > 0 && {BP} }} | count_over_time()',
+                  desc="Job attempts that were retries (`buildkite.job.retries_count` > 0).", thresholds=BAD), 4, 4, 20)
+    d.next_line(4)
+    d.place(ts("Builds by state",
+               [tql(f'{{ name = "buildkite.build" && {BP} }} | count_over_time() by (span.buildkite.build.state)',
+                    instant=False)], TEMPO, unit="short", bars=True, stack=True, rename="span.buildkite.build.state",
+               desc="Finished builds per interval, by final state."), 12, 8, 0)
+    d.place(ts("p95 queue wait by queue",
+               [tql(f'{{ name = "buildkite.job" && {BP} }} | quantile_over_time(span.buildkite.job.wait_time_ms, .95) '
+                    f'by (span.buildkite.agent.queue)', instant=False)], TEMPO, unit="ms", points=True,
+               rename="span.buildkite.agent.queue",
+               desc="How long jobs wait for an agent on each queue. On kube this includes the time to start the job pod."),
+            12, 8, 12)
+    d.next_line(8)
+    d.place(tbar("Average queue wait per step",
+                 f'{{ name = "buildkite.job" && {BP} }} | avg_over_time(span.buildkite.job.wait_time_ms) '
+                 f'by (span.buildkite.step.label)', unit="ms",
+                 desc="Which steps wait longest for an agent."), 8, 8, 0)
+    d.place(tbar("Retries per step",
+                 f'{{ name = "buildkite.job" && span.buildkite.job.retries_count > 0 && {BP} }} | count_over_time() '
+                 f'by (span.buildkite.step.label)', unit="none",
+                 desc="Retried attempts per step. Empty means no retries in the range."), 8, 8, 8)
+    d.place(trace_table("Recent failed builds",
+                        f'{{ name = "buildkite.build" && span.buildkite.build.state = "failed" && {BP} }} '
+                        f'| select(span.buildkite.build.number, span.buildkite.build.branch, span.buildkite.build.source)',
+                        table="spans", limit=20,
+                        desc="Click a trace ID to see the whole build: stages, steps, jobs."), 8, 8, 16)
+    d.next_line(8)
+
+    d.row("Inside jobs on kube: overview")
     d.place(tstat("Jobs run", f'{{ name = "command" && {TP} }} | count_over_time()',
                   desc="One `command` span per job.", thresholds=OK), 4, 4, 0)
     d.place(tstat("Failed jobs", f'{{ name = "command" && status = error && {TP} }} | count_over_time()',
@@ -242,8 +300,9 @@ def ci():
     d.next_line(9)
 
     return dashboard("buildkite-ci", "Buildkite CI",
-                     "Job phases, failures and CLI overhead from Buildkite agent OpenTelemetry data.",
-                     d, [DS_METRICS, DS_LOGS, DS_TRACES, PIPELINE])
+                     "Builds and queue wait from Buildkite's OpenTelemetry integration, plus job phases, failures "
+                     "and CLI overhead from the agent in each job pod.",
+                     d, [DS_METRICS, DS_LOGS, DS_TRACES, PIPELINE_ALL])
 
 
 # ================================================================ Logs
@@ -257,6 +316,14 @@ def logs_dash():
                  "a line's details to see its build, job and `trace_id`; the trace ID links to the job's trace."),
             24, 3, 0)
     d.next_line(3)
+
+    d.place(trace_table("Recent builds (Buildkite OpenTelemetry integration)",
+                        f'{{ name = "buildkite.build" && {BP} }} | select(span.buildkite.build.number, '
+                        f'span.buildkite.build.state, span.buildkite.build.branch)',
+                        table="spans", limit=20,
+                        desc="Find a build number to put in the Build box. Logs exist only for jobs that ran on kube. "
+                             "Empty until the integration is on."), 24, 7, 0)
+    d.next_line(7)
 
     d.row("Volume")
     d.place(ts("Log lines by pipeline", [loki(f'sum by (buildkite_pipeline_slug) (count_over_time({LOG_SEL} [$__auto]))',
@@ -316,13 +383,50 @@ def logs_dash():
 
 def traces_dash():
     d = Dash()
-    d.place(text("Each Buildkite job produces two traces under agent-stack-k8s, one for the checkout "
-                 "container and one for the command container. Both have the job's step as the root span "
-                 "and share `buildkite.job_id`. Click a trace ID to open the trace; from any span, "
-                 "**Logs for this span** opens its job output."), 24, 3, 0)
+    d.place(text("Two kinds of traces. **Builds** (top section) come from Buildkite's OpenTelemetry integration: "
+                 "one trace per build (`buildkite.build` → steps → `buildkite.job`) for every pipeline and queue, "
+                 "empty until the integration is on. **Jobs on kube** (below) come from the agent in each job pod: "
+                 "two traces per job, one for the checkout container and one for the command container, sharing "
+                 "`buildkite.job_id`. Click a trace ID to open it; from an agent span, **Logs for this span** opens "
+                 "its job output."), 24, 3, 0)
     d.next_line(3)
 
-    d.row("Jobs over time")
+    d.row("Builds (Buildkite OpenTelemetry integration)")
+    d.place(ts("Builds by pipeline",
+               [tql(f'{{ name = "buildkite.build" && {BP} }} | count_over_time() by (resource.buildkite.pipeline.slug)',
+                    instant=False)], TEMPO, unit="short", bars=True, stack=True,
+               rename="resource.buildkite.pipeline.slug"), 12, 8, 0)
+    d.place(ts("Failed builds by pipeline",
+               [tql(f'{{ name = "buildkite.build" && span.buildkite.build.state = "failed" && {BP} }} '
+                    f'| count_over_time() by (resource.buildkite.pipeline.slug)', instant=False)],
+               TEMPO, unit="short", bars=True, stack=True, rename="resource.buildkite.pipeline.slug"), 12, 8, 12)
+    d.next_line(8)
+    d.place(ts("p95 build duration by pipeline",
+               [tql(f'{{ name = "buildkite.build" && {BP} }} | quantile_over_time(duration, .95) '
+                    f'by (resource.buildkite.pipeline.slug)', instant=False)], TEMPO, points=True,
+               rename="resource.buildkite.pipeline.slug",
+               desc="Approximate: Tempo buckets durations in powers of two."), 12, 9, 0)
+    d.place(ts("p95 queue wait by step",
+               [tql(f'{{ name = "buildkite.job" && {BP} }} | quantile_over_time(span.buildkite.job.wait_time_ms, .95) '
+                    f'by (span.buildkite.step.label)', instant=False)], TEMPO, unit="ms", points=True,
+               rename="span.buildkite.step.label",
+               desc="How long each step's jobs waited for an agent (`buildkite.job.wait_time_ms`)."), 12, 9, 12)
+    d.next_line(9)
+    d.place(trace_table("Builds",
+                        f'{{ name = "buildkite.build" && {BP} }} | select(span.buildkite.build.number, '
+                        f'span.buildkite.build.state, span.buildkite.build.branch, span.buildkite.build.source)',
+                        table="spans", limit=50,
+                        desc="One row per build. Sort by Duration to find the slowest; click to see its steps and jobs."),
+            12, 10, 0)
+    d.place(trace_table("Longest queue waits",
+                        f'{{ name = "buildkite.job" && span.buildkite.job.wait_time_ms > 0 && {BP} }} '
+                        f'| select(span.buildkite.job.wait_time_ms, span.buildkite.step.label, '
+                        f'span.buildkite.agent.queue, span.buildkite.build.number)',
+                        table="spans", limit=50,
+                        desc="Jobs that waited for an agent. Sort by the wait column."), 12, 10, 12)
+    d.next_line(10)
+
+    d.row("Jobs on kube over time")
     d.place(ts("Jobs by pipeline", [tql(f'{{ name = "command" && {TP} }} | count_over_time() by (resource.buildkite.pipeline)',
                                         instant=False)], TEMPO, unit="short", bars=True, stack=True,
                rename="resource.buildkite.pipeline"), 12, 8, 0)
@@ -361,8 +465,9 @@ def traces_dash():
                         desc="Every span that ended with an error, with its build and step."), 12, 10, 12)
     d.next_line(10)
 
-    return dashboard("buildkite-traces", "Buildkite traces", "Explore Buildkite job traces in Tempo.", d,
-                     [DS_TRACES, PIPELINE])
+    return dashboard("buildkite-traces", "Buildkite traces",
+                     "Explore Buildkite build traces (OpenTelemetry integration) and job traces (agent) in Tempo.", d,
+                     [DS_TRACES, PIPELINE_ALL])
 
 
 # ================================================================ Infrastructure
@@ -409,8 +514,23 @@ def infra_dash():
                PROM, unit="short"), 12, 7, 12)
     d.next_line(7)
 
+    d.row("Queue wait (Buildkite OpenTelemetry integration)")
+    d.place(ts("p95 queue wait by queue",
+               [tql('{ name = "buildkite.job" } | quantile_over_time(span.buildkite.job.wait_time_ms, .95) '
+                    'by (span.buildkite.agent.queue)', instant=False)], TEMPO, unit="ms", points=True,
+               rename="span.buildkite.agent.queue",
+               desc="How long jobs wait for an agent, per queue. A rising line on kube with jobs in flight at "
+                    "max-in-flight means the controller is the bottleneck. Empty until the integration is on."),
+            12, 8, 0)
+    d.place(ts("Jobs started by queue",
+               [tql('{ name = "buildkite.job" } | count_over_time() by (span.buildkite.agent.queue)', instant=False)],
+               TEMPO, unit="short", bars=True, stack=True, rename="span.buildkite.agent.queue",
+               desc="Job attempts per queue, from Buildkite's side."), 12, 8, 12)
+    d.next_line(8)
+
     return dashboard("buildkite-infra", "Buildkite infrastructure",
-                     "agent-stack-k8s controller health.", d, [DS_METRICS])
+                     "agent-stack-k8s controller health, and queue wait from Buildkite's OpenTelemetry integration.",
+                     d, [DS_METRICS, DS_TRACES])
 
 
 if __name__ == "__main__":

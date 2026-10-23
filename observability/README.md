@@ -119,10 +119,23 @@ Cloud's Kubernetes Monitoring app covers the cluster itself.
 
 | Dashboard | Use it to | Data |
 |-----------|-----------|------|
-| **Buildkite CI** (`buildkite-ci.json`) | See jobs, failures and where job time goes at a glance | Traces, logs, metrics |
-| **Buildkite logs** (`buildkite-logs.json`) | Find job output: volume by pipeline and step, error lines, lines per job, full-text search | Logs |
-| **Buildkite traces** (`buildkite-traces.json`) | Dig into durations: jobs and failures over time, p95 per step, phase and git timings, sortable job list | Traces |
-| **Buildkite infrastructure** (`buildkite-infra.json`) | Check the agent-stack-k8s controller: jobs in flight, time to create Kubernetes Jobs, failures | Metrics |
+| **Buildkite CI** (`buildkite-ci.json`) | See builds, failures and queue wait for every pipeline, then where job time goes inside `kube` jobs | Traces (Buildkite's OpenTelemetry integration and the agent), logs, metrics |
+| **Buildkite logs** (`buildkite-logs.json`) | Find job output: a recent-builds table to pick a build, volume by pipeline and step, error lines, lines per job, full-text search | Logs, traces (integration, for the builds table) |
+| **Buildkite traces** (`buildkite-traces.json`) | Dig into durations: builds and failed builds per pipeline, build duration and queue wait trends, sortable builds and queue-wait tables; then jobs on `kube`, phase and git timings, sortable job list | Traces (integration and agent) |
+| **Buildkite infrastructure** (`buildkite-infra.json`) | Check the agent-stack-k8s controller (jobs in flight, time to create Kubernetes Jobs, failures) and queue wait and jobs started per queue | Metrics, traces (integration) |
+
+Each dashboard also has a section fed by Buildkite's OpenTelemetry integration
+(`service.name` = `buildkite`): builds, steps and jobs as Buildkite sees them,
+including `buildkite.job.wait_time_ms`, for every pipeline and queue. That's the
+top section of **Buildkite CI** and **Buildkite traces**, the recent-builds table
+on **Buildkite logs**, and the queue-wait row on **Buildkite infrastructure**.
+These stay empty until the integration is on. To send it to this stack, add an
+OpenTelemetry notification service under **Organization settings → Notification
+Services** with endpoint `https://otlp-gateway-prod-us-east-2.grafana.net/otlp`
+and header `Authorization: Basic <base64 of instance-id:token>`, using a token
+with `traces:write`. Everything else uses the agent's spans and logs from jobs
+on `kube`. On the CI and traces dashboards, the pipeline list comes from the
+integration's `buildkite.pipeline.slug`, so it covers every pipeline.
 
 The variables at the top pick the stack's `grafanacloud-<stack>-traces`,
 `-logs` and `-prom` data sources and the pipelines. Counts and averages from

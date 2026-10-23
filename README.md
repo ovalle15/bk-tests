@@ -183,10 +183,10 @@ Import**:
 
 | File | Dashboard |
 |------|-----------|
-| `buildkite-ci.json` | Buildkite CI: jobs, failures and where job time goes |
-| `buildkite-logs.json` | Buildkite logs: job output by pipeline, step and build |
-| `buildkite-traces.json` | Buildkite traces: durations, phases and a list of jobs |
-| `buildkite-infra.json` | Buildkite infrastructure: agent-stack-k8s controller health |
+| `buildkite-ci.json` | Buildkite CI: builds, failures and queue wait (needs Buildkite's OpenTelemetry integration), plus where job time goes on `kube` |
+| `buildkite-logs.json` | Buildkite logs: job output by pipeline, step and build, with a recent-builds table to pick a build |
+| `buildkite-traces.json` | Buildkite traces: builds, build duration and queue wait per step, then job phases and a list of jobs on `kube` |
+| `buildkite-infra.json` | Buildkite infrastructure: agent-stack-k8s controller health and queue wait per queue |
 
 They pick the stack's data sources automatically. To change them, edit
 `observability/dashboards/make_dashboards.py`, regenerate, and re-import with
