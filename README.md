@@ -1,24 +1,13 @@
-# bk-tests
+# Sending Buildkite metrics from K8s through OTlP to Grafana 
 
 Buildkite pipelines that run on a local Kubernetes cluster, with traces, logs
 and metrics from every job sent to Grafana Cloud.
 
-```
-Buildkite (queue: kube)
-   │  jobs
-   ▼
-agent-stack-k8s controller ── creates one pod per job ──▶ job pod
-   (namespace buildkite)                                    │ traces + logs (OTLP)
-        ▲                                                   ▼
-        └───────── scraped for metrics ─────────── Alloy, k8s-monitoring (namespace monitoring)
-                                                     │  also collects cluster metrics,
-                                                     │  Kubernetes events and object changes
-                                                     ▼
-                                           Grafana Cloud: Tempo, Loki, Mimir
-                                                     │
-                                                     ▼
-                                    Buildkite + Kubernetes Monitoring dashboards
-```
+![Architecture: Buildkite job pods send traces and logs over OTLP to Alloy in the monitoring namespace. Alloy scrapes the agent-stack-k8s controller and the cluster's telemetry services, fetches pipelines from Fleet Management, and writes to Tempo, Loki and Mimir in Grafana Cloud, which the Grafana dashboards query.](docs/architecture.png)
+
+Job pods push traces and logs to Alloy over OTLP (solid arrows). Alloy scrapes
+the controller and the cluster's exporters (dashed), fetches its pipelines from
+Fleet Management every 30 seconds, and forwards everything to Grafana Cloud.
 
 This README covers the whole setup in order. The details for each part live
 next to its config:
@@ -28,10 +17,6 @@ next to its config:
 | Job runner | `helm/values.yaml`, `helm/otel-env.yaml` | `helm/README.md` |
 | Cluster monitoring and Grafana Cloud | `observability/k8s-monitoring-values.yaml` | `observability/README.md` |
 | Dashboards | `observability/dashboards/` | `observability/README.md` |
-| Build step (`make build`) | `Makefile`, `.buildkite/pipeline.annotation.yaml` | Comments in those files |
-| Trigger to ao-deploy | `scripts/generate_pipeline.py` | Step 5 below |
-| ao-deploy image builds | `.buildkite/pipeline.yaml` in `ovalle15/ao-bk-playground` (branch `ao-deploy`) | Step 5 below |
-| Queue routing | `.buildkite/queue-routing.json` | `.buildkite/README.queues.md` |
 
 ## What you need
 
@@ -57,13 +42,13 @@ Versions this setup was built and tested with:
    **self-hosted** queue with the key `kube`.
 2. On the cluster's **Agent Tokens** page, create a token for the controller.
    Keep it out of the repo; you'll pass it to Helm in step 3.
-3. Point pipeline steps at the queue. `command` is whatever the step runs; for
-   example, this repo's queue-routing check:
+3. Point pipeline steps at the queue. Every job on `kube` runs in its own pod
+   and sends traces and logs to Grafana Cloud:
 
    ```yaml
    steps:
-     - label: ":cat: Validate queue routing"
-       command: python3 scripts/queue_router.py validate
+     - label: "Tests"
+       command: echo "Hello from Kubernetes"
        agents:
          queue: kube
    ```
@@ -167,10 +152,6 @@ Job pods run agent v4, which only reads `BUILDKITE_OPENTELEMETRY_TRACING`. The
 controller's own `agent-config.tracing-backend` option sets the older v3
 variable, so don't rely on it.
 
-Steps that deploy to the cluster (the `nasa-image` app) need RBAC for the
-`buildkite-agent` service account in the target namespace. Here it's bound to
-the `buildkite-nasa-image-deployer` Role in `nasa-image`.
-
 **Check:** `kubectl -n buildkite get pods` shows `agent-stack-k8s-…` as
 `Running`, and the controller's log contains `Starting controller … queue=kube`:
 
@@ -195,85 +176,7 @@ Each job produces two traces, one from the checkout container and one from the
 command container. Both carry the same `buildkite.job_id`. The cluster itself
 (nodes, pods, events) is in Grafana Cloud's **Kubernetes Monitoring** app.
 
-## 5. ao-deploy: the triggered pipeline
-
-ao-tests' generated pipeline (`scripts/generate_pipeline.py`) ends with a
-trigger step that starts the **ao-deploy** pipeline. ao-deploy builds a
-different repository, `ovalle15/ao-bk-playground`, and pushes the `nasa-image`
-app and server images to the Buildkite Package Registry.
-
-- **Branch:** the trigger sets `branch: ao-deploy`. Without it, Buildkite builds
-  ao-bk-playground's default branch, `main`, instead.
-- **Queue:** the trigger passes `QUEUE=kube` as an environment variable, but
-  ao-deploy's own `.buildkite/pipeline.yaml` decides where its steps run.
-
-**Building images on `kube`:** job pods have the Docker CLI but no Docker
-daemon, so `docker build`, `docker buildx` and any Docker-daemon builder fail
-with `failed to connect to the docker API at unix:///var/run/docker.sock`. The
-image step therefore builds with rootless BuildKit in the job pod: no Docker
-daemon and no privileged container. The step on ao-bk-playground's `ao-deploy`
-branch should look like this:
-
-```yaml
-steps:
-  - key: "docker"
-    label: ":kubernetes: Build & Push app/server"
-    agents:
-      queue: "kube"
-    plugins:
-      - kubernetes:
-          podSpec:
-            securityContext:     # the rootless image runs as uid 1000
-              runAsUser: 1000
-              runAsGroup: 1000
-            containers:
-              - image: moby/buildkit:v0.33.1-rootless
-                securityContext:
-                  seccompProfile:
-                    type: Unconfined
-                  appArmorProfile:
-                    type: Unconfined
-                env:
-                  - name: BUILDKITD_FLAGS
-                    value: --oci-worker-no-process-sandbox
-    command: |
-      set -eu
-      umask 077
-      REGISTRY=packages.buildkite.com/spacecamp/nasa-image
-      DOCKER_CONFIG="$$(mktemp -d)"
-      export DOCKER_CONFIG
-      trap 'rm -rf "$$DOCKER_CONFIG"' EXIT
-      TOKEN="$$(buildkite-agent oidc request-token --audience "https://$$REGISTRY" --lifetime 300)"
-      AUTH="$$(printf 'buildkite:%s' "$$TOKEN" | base64 | tr -d '\n')"
-      printf '{"auths":{"packages.buildkite.com":{"auth":"%s"}}}\n' "$$AUTH" > "$$DOCKER_CONFIG/config.json"
-      unset TOKEN AUTH
-      for image in app server; do
-        buildctl-daemonless.sh build --frontend dockerfile.v0 \
-          --local context=./$$image --local dockerfile=./$$image \
-          --output type=image,name=$$REGISTRY/$$image:latest,push=true
-      done
-```
-
-The images are built for the cluster's architecture only (arm64 on Rancher
-Desktop on Apple silicon), with no layer cache between builds. `$$` is how
-Buildkite pipeline YAML writes a literal `$`; pipeline upload turns it back
-into one.
-
-**Package Registry login:** the step logs in with an OIDC token from
-`buildkite-agent oidc request-token`. The `nasa-image` registry's OIDC policy
-decides which builds may push; if it restricts `build_branch`, it must allow
-`ao-deploy`. A build on `main` gets `unauthorized: authentication required`.
-To allow several branches, use a list:
-
-```yaml
-claims:
-  build_branch:
-    in:
-      - ao-deploy
-      - main
-```
-
-## 6. Grafana Cloud: import the dashboards
+## 5. Grafana Cloud: import the dashboards
 
 Import each file from `observability/dashboards/` under **Dashboards → New →
 Import**:
@@ -301,10 +204,6 @@ overwrite; see `observability/README.md`.
 | Cluster metrics or Kubernetes events missing | Fleet Management pipelines not set up | Finish the Kubernetes Monitoring setup in Grafana Cloud (step 2.4). |
 | Controller metrics missing | Annotations not on the controller pod | `helm/values.yaml` sets them; re-run the step 3 upgrade. |
 | Alloy logs `failed to get informer` for podmonitors, servicemonitors, probes | No Prometheus Operator CRDs in this cluster | Harmless; see "Known noise" in `observability/README.md`. |
-| A build doesn't start after a push | GitHub webhook delayed or not delivered | Check githubstatus.com, or start the build from **New Build** in Buildkite. |
-| `failed to connect to the docker API at unix:///var/run/docker.sock` | A step on `kube` uses Docker; job pods have no Docker daemon | Build images with BuildKit (step 5). |
-| ao-deploy builds `main` instead of `ao-deploy` | The trigger step has no `branch` | `scripts/generate_pipeline.py` sets `branch: ao-deploy`; make sure that version is pushed. |
-| `unauthorized: authentication required` at the registry login | The Package Registry's OIDC policy doesn't allow this build (often its branch) | Add the branch to the policy's `build_branch` claim (step 5). |
 | Cluster metrics or events missing, but Alloy is running | `cluster.name` doesn't match the cluster chosen in Grafana Cloud | Set it to the onboarding's cluster name and re-run the step 2 `helm upgrade`. |
 
 ## Credentials
