@@ -48,10 +48,6 @@ PIPELINE = {"name": "pipeline", "label": "Pipeline", "type": "query", "datasourc
             "query": {"label": "buildkite.pipeline", "type": 1, "refId": "pipeline"},
             "refresh": 2, "multi": True, "includeAll": True, "allValue": ".*",
             "current": {"text": "All", "value": "$__all"}, "sort": 1}
-# Same variable, listing pipelines from Buildkite's OpenTelemetry integration, which
-# covers every pipeline it's enabled for (not only those on kube). Same slugs, so the
-# agent-based panels filter correctly too.
-PIPELINE_ALL = {**PIPELINE, "query": {"label": "buildkite.pipeline.slug", "type": 1, "refId": "pipeline"}}
 
 
 def textbox(name, label, default):
@@ -302,7 +298,7 @@ def ci():
     return dashboard("buildkite-ci", "Buildkite CI",
                      "Builds and queue wait from Buildkite's OpenTelemetry integration, plus job phases, failures "
                      "and CLI overhead from the agent in each job pod.",
-                     d, [DS_METRICS, DS_LOGS, DS_TRACES, PIPELINE_ALL])
+                     d, [DS_METRICS, DS_LOGS, DS_TRACES, PIPELINE])
 
 
 # ================================================================ Logs
@@ -467,7 +463,7 @@ def traces_dash():
 
     return dashboard("buildkite-traces", "Buildkite traces",
                      "Explore Buildkite build traces (OpenTelemetry integration) and job traces (agent) in Tempo.", d,
-                     [DS_TRACES, PIPELINE_ALL])
+                     [DS_TRACES, PIPELINE])
 
 
 # ================================================================ Infrastructure

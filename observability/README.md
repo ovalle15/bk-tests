@@ -134,8 +134,9 @@ OpenTelemetry notification service under **Organization settings → Notificatio
 Services** with endpoint `https://otlp-gateway-prod-us-east-2.grafana.net/otlp`
 and header `Authorization: Basic <base64 of instance-id:token>`, using a token
 with `traces:write`. Everything else uses the agent's spans and logs from jobs
-on `kube`. On the CI and traces dashboards, the pipeline list comes from the
-integration's `buildkite.pipeline.slug`, so it covers every pipeline.
+on `kube`. The pipeline lists come from the agent's `buildkite.pipeline` tag, so
+they show pipelines that ran on `kube` in the dashboard's time range; **All** still
+includes every pipeline in the integration panels.
 
 The variables at the top pick the stack's `grafanacloud-<stack>-traces`,
 `-logs` and `-prom` data sources and the pipelines. Counts and averages from

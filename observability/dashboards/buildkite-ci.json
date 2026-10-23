@@ -56,7 +56,7 @@
           "uid": "${ds_traces}"
         },
         "query": {
-          "label": "buildkite.pipeline.slug",
+          "label": "buildkite.pipeline",
           "type": 1,
           "refId": "pipeline"
         },
