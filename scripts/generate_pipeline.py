@@ -9,7 +9,7 @@ from queue_router import QueueRouter
 def generate_pipeline(branch: str, router: QueueRouter) -> dict:
     # Main runs an extra suite; feature branches get faster feedback.
     suites = ["unit", "integration"]
-    if branch in ["ao-deploy", "main", "ao-tests"]:
+    if branch in ["ao-deploy", "main", "ao-tests", "ao-cache"]:
         suites.append("e2e")
 
     steps = [
