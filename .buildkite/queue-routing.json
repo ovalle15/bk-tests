@@ -1,10 +1,15 @@
 {
   "queues": {
+    "linux-sm-hosted": {
+      "key": "linux-sm",
+      "type": "hosted",
+      "environment_override": "BUILDKITE_QUEUE_LINUX_HOSTED"
+    },
     "kubernetes": {
       "key": "kube",
       "type": "self_hosted",
       "environment_override": "BUILDKITE_QUEUE_KUBERNETES",
-      "description": "Self-hosted Kubernetes agents used by the NASA application."
+      "description": "Self-hosted Kubernetes jobs run by agent-stack-k8s, traced with otel"
     },
     "macos-medium": {
       "key": "macos-med",
@@ -23,31 +28,40 @@
       "type": "self_hosted",
       "environment_override": "BUILDKITE_QUEUE_DEFAULT",
       "description": "The test cluster's default queue."
+    },
+    "mac-cache": {
+      "key": "cache",
+      "type": "self_hosted",
+      "environment_override": "BUILDKITE_QUEUE_MAC_CACHE",
+      "description": "Self-hosted Buildkite agent on Andrea's Mac, for the ao-cache pipeline."
     }
   },
   "pipelines": {
     "ao-tests": {
-      "queue": "kube"
+      "queue": "kubernetes"
     },
     "ao-deploy": {
-      "queue": "kube"
+      "queue": "kubernetes"
+    },
+    "ao-cache": {
+      "queue": "mac-cache"
     }
   },
   "workloads": {
     "record-cluster": {
-      "queue": "kube"
+      "queue": "kubernetes"
     },
     "unit": {
-      "queue": "default"
+      "queue": "kubernetes"
     },
     "integration": {
-      "queue": "kube"
+      "queue": "kubernetes"
     },
     "e2e": {
-      "queue": "macos-medium"
+      "queue": "kubernetes"
     },
     "summary": {
-      "queue": "kube"
+      "queue": "kubernetes"
     }
   }
 }

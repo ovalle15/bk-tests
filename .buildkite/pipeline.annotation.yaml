@@ -1,0 +1,43 @@
+steps:
+  - label: "Build"
+    agents:
+      queue: "kube"
+    plugins:
+      # The default agent image has no make; this one has make, python3 and git.
+      - kubernetes:
+          podSpec:
+            containers:
+              - image: python:3.12-bookworm
+    artifact_paths:
+      - "build/**/*"
+    command: |
+      # This runs under /bin/sh (dash in this image), so it sticks to POSIX sh:
+      # no pipefail. Shell variables are written with a doubled dollar sign,
+      # which pipeline upload turns back into one; a single one would be
+      # replaced with an empty value before the step runs.
+      #
+      # Run the build, show the output live, and save it to a file. The build's
+      # exit status is written to build.status, because a pipeline's status is
+      # tee's. "|| status=" also keeps the shell's -e from exiting when the
+      # build fails, so the deprecation annotation still runs.
+      { status=0; make build 2>&1 || status=$$?; echo "$$status" > build.status; } | tee build.log
+      BUILD_STATUS=$$(cat build.status)
+
+      # Keep only the unique deprecation messages
+      grep -i "deprecat" build.log | sort -u > deprecations.log || true
+
+      # Annotate only if any were found
+      if [ -s deprecations.log ]; then
+        COUNT=$$(wc -l < deprecations.log | tr -d ' ')
+
+        echo "### $$COUNT unique deprecation warnings" > annotation.md
+        echo '```' >> annotation.md
+        cat deprecations.log >> annotation.md
+        echo '```' >> annotation.md
+
+        buildkite-agent annotate --style warning --context deprecations < annotation.md
+        buildkite-agent artifact upload deprecations.log
+      fi
+
+      # Keep the step's original pass or fail result
+      exit $$BUILD_STATUS
