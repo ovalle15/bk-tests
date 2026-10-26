@@ -28,6 +28,12 @@
       "type": "self_hosted",
       "environment_override": "BUILDKITE_QUEUE_DEFAULT",
       "description": "The test cluster's default queue."
+    },
+    "mac-cache": {
+      "key": "cache",
+      "type": "self_hosted",
+      "environment_override": "BUILDKITE_QUEUE_MAC_CACHE",
+      "description": "Self-hosted Buildkite agent on Andrea's Mac, for the ao-cache pipeline."
     }
   },
   "pipelines": {
@@ -36,6 +42,9 @@
     },
     "ao-deploy": {
       "queue": "kubernetes"
+    },
+    "ao-cache": {
+      "queue": "mac-cache"
     }
   },
   "workloads": {

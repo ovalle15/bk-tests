@@ -27,10 +27,15 @@ def config():
                 "key": "eks",
                 "type": "self_hosted",
             },
+            "mac-cache": {
+                "key": "cache",
+                "type": "self_hosted",
+            },
         },
         "pipelines": {
             "ao-tests": {"queue": "kube"},
             "ao-deploy": {"queue": "deploy-agents"},
+            "ao-cache": {"queue": "mac-cache"},
         },
         "workloads": {
             "record-cluster": {"queue": "kubernetes"},
@@ -109,8 +114,9 @@ class QueueRouterTests(unittest.TestCase):
         pipeline = generate_pipeline("main", router)
         trigger = next(step for step in pipeline["steps"] if "trigger" in step)
 
-        self.assertEqual(trigger["build"]["env"]["QUEUE"], "deploy-queue")
-        self.assertEqual(trigger["build"]["branch"], "ao-deploy")
+        self.assertEqual(trigger["trigger"], "ao-cache")
+        self.assertEqual(trigger["build"]["env"]["QUEUE"], "cache")
+        self.assertEqual(trigger["build"]["branch"], "ao-cache")
         self.assertNotIn("agents", trigger)
 
 
