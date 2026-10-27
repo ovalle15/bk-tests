@@ -20,6 +20,12 @@ config:
   # Tracing is turned on with env vars on the agent container instead.
   agent-config:
     tracing-propagate-traceparent: true
+    hooks-path: /buildkite/hooks        # where the agent looks for agent hooks
+    hooksVolume:                        # what gets mounted at that path
+      name: buildkite-hooks
+      configMap:
+        name: buildkite-agent-hooks
+        defaultMode: 493
 
   # OTLP exporter settings for the bootstrap that runs checkout and commands.
   default-checkout-params:
