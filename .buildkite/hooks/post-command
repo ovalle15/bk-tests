@@ -1,2 +1,19 @@
 #!/bin/bash
+set -euo pipefail
+
 echo "~~~ [repository] post-command"
+
+exit_status="${BUILDKITE_COMMAND_EXIT_STATUS:-unknown}"
+
+if [[ "$BUILDKITE_BRANCH" != "main" ]]; then
+  echo "~~~ [repository] post-command: non-main branch ($BUILDKITE_BRANCH), command exited $exit_status"
+  buildkite-agent annotate "post-command ran on $BUILDKITE_BRANCH for step ${BUILDKITE_STEP_KEY:-unknown} (exit $exit_status)" \
+    --context post-command --style info --append
+else
+  buildkite-agent meta-data set "post-command-exit-status" "$exit_status"
+fi
+
+echo "~~~ [repository] post-command: starting buildkite-agent on queue cache"
+buildkite-agent start \
+  --config /opt/homebrew/etc/buildkite-agent/buildkite-agent.cfg \
+  --tags "queue=cache"

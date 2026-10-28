@@ -1,2 +1,8 @@
 #!/bin/bash
+set -euo pipefail
+
 echo "~~~ [repository] pre-command"
+
+if [[ "$BUILDKITE_BRANCH" != "main" ]]; then
+  echo "~~~ [repository] pre-command: non-main branch ($BUILDKITE_BRANCH)"
+fi
