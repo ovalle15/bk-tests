@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
+BUILDKITE_COMMAND_EXIT_STATUS="exit 3"
 exit_status="${BUILDKITE_COMMAND_EXIT_STATUS:-unknown}"
 
 if [[ "$BUILDKITE_BRANCH" != "main" ]]; then
