@@ -5,7 +5,7 @@ exit_status="${BUILDKITE_COMMAND_EXIT_STATUS:-unknown}"
 
 if [[ "$BUILDKITE_BRANCH" != "main" ]]; then
   echo "~~~ [repository] post-command: non-main branch ($BUILDKITE_BRANCH), command exited $exit_status"
-  buildkite-agent annotate "post-command ran on $BUILDKITE_BRANCH for step ${BUILDKITE_STEP_KEY:-unknown} (exit $exit_status)" \
+  buildkite-agent annotate "post-command ran on $BUILDKITE_BRANCH for step ${BUILDKITE_STEP_KEY:-hooks-lab} (exit $exit_status)" \
     --context post-command --style info --append
 else
   buildkite-agent meta-data set "post-command-exit-status" "$exit_status"
