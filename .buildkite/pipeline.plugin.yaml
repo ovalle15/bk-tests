@@ -1,0 +1,6 @@
+steps:
+  - label: "🐚 Lint"
+    plugins:
+      - plugin-linter#v3.3.0:
+          id: ovalle15/bk-tests#file-counter
+

@@ -1,0 +1,11 @@
+name: file-counter
+description: Annotates the build with a file count
+author: https://github.com/ovalle15
+requirements: []
+configuration:
+  properties:
+    pattern:
+      type: string
+      description: Filename glob to count, such as "*.go" (default "*")
+  additionalProperties: false
+  

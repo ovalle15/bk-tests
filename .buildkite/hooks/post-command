@@ -1,13 +1,26 @@
+# #!/bin/bash
+# set -euo pipefail
+
+# BUILDKITE_COMMAND_EXIT_STATUS="0"
+# exit_status="${BUILDKITE_COMMAND_EXIT_STATUS:-unknown}"
+
+# if [[ "$BUILDKITE_BRANCH" != "main" ]]; then
+#   echo "~~~ [repository] post-command: non-main branch ($BUILDKITE_BRANCH), command exited $exit_status"
+#   buildkite-agent annotate "post-command ran on $BUILDKITE_BRANCH for step ${BUILDKITE_STEP_KEY:-hooks-lab} (exit $exit_status)" \
+#     --context post-command --style info --append
+# else
+#   buildkite-agent meta-data set "post-command-exit-status" "$exit_status"
+# fi
+
 #!/bin/bash
 set -euo pipefail
 
-BUILDKITE_COMMAND_EXIT_STATUS="0"
-exit_status="${BUILDKITE_COMMAND_EXIT_STATUS:-unknown}"
+PATTERN="$BUILDKITE_PLUGIN_FILE_COUNTER_PATTERN"
 
-if [[ "$BUILDKITE_BRANCH" != "main" ]]; then
-  echo "~~~ [repository] post-command: non-main branch ($BUILDKITE_BRANCH), command exited $exit_status"
-  buildkite-agent annotate "post-command ran on $BUILDKITE_BRANCH for step ${BUILDKITE_STEP_KEY:-hooks-lab} (exit $exit_status)" \
-    --context post-command --style info --append
-else
-  buildkite-agent meta-data set "post-command-exit-status" "$exit_status"
-fi
+echo "--- :1234: Counting the number of files"
+
+COUNT=$(find . -name "$PATTERN" | wc -l)
+
+echo "Found ${COUNT} files matching ${PATTERN}"
+
+buildkite-agent annotate "Found ${COUNT} files matching ${PATTERN}"

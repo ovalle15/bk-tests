@@ -1,0 +1,7 @@
+version: '2'
+services:
+  tests:
+    image: buildkite/plugin-tester
+    command: ['--id', 'ovalle15/bk-tests#file-counter']
+    volumes:
+      - ".:/plugin:ro"

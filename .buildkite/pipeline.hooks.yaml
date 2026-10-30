@@ -1,6 +1,0 @@
-steps:
-  - label: ":hook: Hooks lab"
-    key: hooks-lab
-    agents:
-      queue: "kube"
-    command: "echo hello"
