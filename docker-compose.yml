@@ -5,4 +5,3 @@ services:
     command: ['--id', 'ovalle15/bk-tests#file-counter']
     volumes:
       - ".:/plugin:ro"
-
