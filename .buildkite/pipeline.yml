@@ -17,7 +17,7 @@ steps:
 
   - label: ":test_tube: API tests"
     key: "api-tests"
-    parallelism: 3
+    parallelism: 2
     env:
       PYTHON_COLORS: "0"
     command:
