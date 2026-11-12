@@ -15,6 +15,7 @@ steps:
   - label: ":test_tube: API tests"
     key: "api-tests"
     depends_on: "lint"
+    parallelism: 3
     env:
       PYTHON_COLORS: "0"
     command:
