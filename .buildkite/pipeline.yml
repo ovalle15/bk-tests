@@ -14,7 +14,6 @@ steps:
       - label: ":apple: Hosted agent info"
         key: "agent-info"
         command: "demo/scripts/agent-info.sh"
-
       - label: ":python: Lint"
         key: "lint"
         command: "python3 -m py_compile demo/api/server.py demo/tests/test_api.py demo/tests/run.py"

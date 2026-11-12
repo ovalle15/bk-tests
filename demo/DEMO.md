@@ -41,6 +41,18 @@ Matches slide 29 of "Abridge - Buildkite 101": **Commit + push → Pipeline uplo
 | 7:00–8:30 | Build pauses at **Deploy to staging?** Click it, approve. Deploy job downloads the Build artifact and posts a success annotation with who approved it. | Human gate + concurrency group = one deploy at a time. (slides 18, 19) |
 | 8:30–10:00 | Build is **green**. Recap: commit → upload → routed to hosted macOS → annotated results → gated deploy. Q&A. | Wrap-up (slide 30) |
 
+## How the approval works
+
+- **On a red build you can't approve.** The block step depends on API tests and Build. When API tests fail,
+  the step shows as `blocked_failed` (greyed out), so there's nothing to click. This is the point of the gate:
+  only verified work can reach deploy (slide 18).
+- **On the green build** (after the fix), the build pauses with state *Blocked* and the step
+  **:rocket: Deploy to staging?** shows a hand/lock icon in the build graph.
+  1. Click that step (or the **Unblock** button at the top of the build page).
+  2. A dialog shows the prompt "API tests and build passed. Release this commit to staging?"
+  3. Click **Continue**. Deploy (staging) starts, and its annotation shows who approved.
+- You need build permissions on ao-demo to approve. If Continue is missing, check your team access.
+
 ## The live fix
 
 In `demo/api/server.py`, inside `do_GET`:

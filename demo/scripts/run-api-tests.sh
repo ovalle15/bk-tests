@@ -29,7 +29,14 @@ echo "--- :memo: Server log"
 cat "$REPORT_DIR/server.log"
 
 if command -v buildkite-agent > /dev/null; then
-  if [[ $STATUS -eq 0 ]]; then STYLE=success; else STYLE=error; fi
+  if [[ $STATUS -eq 0 ]]; then
+    STYLE=success
+    NEXT=":unlock: **Next:** click the **:rocket: Deploy to staging?** step in the build graph, then click **Continue** to release."
+  else
+    STYLE=error
+    NEXT=":lock: **Deploy to staging? is locked** because API tests failed. Fix the code and push. The new build unlocks the approval."
+  fi
+  printf '\n%s\n' "$NEXT" >> "$REPORT_DIR/summary.md"
   buildkite-agent annotate --style "$STYLE" --context api-tests < "$REPORT_DIR/summary.md"
 fi
 
