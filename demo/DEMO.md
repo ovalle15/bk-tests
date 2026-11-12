@@ -11,22 +11,23 @@ Matches slide 29 of "Abridge - Buildkite 101": **Commit + push → Pipeline uplo
 
 ```
 :pipeline: Upload pipeline        (UI step, runs `buildkite-agent pipeline upload` on macos-medium)
- └─ .buildkite/pipeline.yml
-    ├─ group ":mag: Checks"
-    │   ├─ :apple: Hosted agent info  → info annotation (macOS, M4, Xcode)
-    │   └─ :python: Lint
+ └─ .buildkite/pipeline.yml       (all commands inline)
+    ├─ :apple: Hosted agent info  → info annotation (macOS, M4, Xcode)
+    ├─ :python: Lint
     ├─ :test_tube: API tests   (depends_on lint)  → pass/fail annotation + junit.xml artifact
-    ├─ :package: Build         (depends_on lint)  → dist/notes-api.tar.gz artifact
+    ├─ :package: Build         (depends_on lint)  → notes-api.tar.gz artifact
     ├─ block ":rocket: Deploy to staging?"        (depends_on api-tests + build)
     └─ :rocket: Deploy (staging)  concurrency: 1, concurrency_group: ao-demo/deploy/staging
 ```
+
+Annotation helpers only: `demo/annotations/agent-info.sh` and `demo/tests/run.py` (runs the tests and posts the results annotation).
 
 ## Before the call (2 minutes)
 
 1. `git pull` on `ao-demo`. The working copy should have the bug in `demo/api/server.py`
    (a missing note returns `200` with `null`).
 2. Open the latest **red** build on ao-demo in one tab, and `demo/api/server.py` in your editor.
-3. Optional warm-up: `bash demo/scripts/run-api-tests.sh` locally shows the same failing test.
+3. Optional warm-up: run `python3 demo/api/server.py &` then `python3 demo/tests/run.py demo/reports` to see the same failing test locally.
 
 ## Run of show
 

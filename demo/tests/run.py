@@ -1,9 +1,11 @@
 """Runs the API tests and writes a JUnit XML report plus a Markdown summary.
 
 Usage: python3 demo/tests/run.py <report-dir>
-Exit code is non-zero when any test fails.
+Exit code is non-zero when any test fails. On Buildkite it also posts the
+summary as a build annotation.
 """
 import os
+import subprocess
 import sys
 import time
 import unittest
@@ -90,8 +92,29 @@ def main():
     runner = unittest.TextTestRunner(verbosity=2, resultclass=RecordingResult)
     result = runner.run(suite)
     write_junit(result.records, os.path.join(report_dir, "junit.xml"))
-    _, broken = write_summary(result.records, os.path.join(report_dir, "summary.md"))
+    summary_path = os.path.join(report_dir, "summary.md")
+    _, broken = write_summary(result.records, summary_path)
+    annotate(summary_path, broken)
     sys.exit(1 if broken else 0)
+
+
+def annotate(summary_path, broken):
+    """Posts the summary to the build page. Skipped when not running in Buildkite."""
+    if not os.environ.get("BUILDKITE"):
+        return
+    if broken:
+        style = "error"
+        note = (":lock: **Deploy to staging? is locked** because API tests failed. "
+                "Fix the code and push. The new build unlocks the approval.")
+    else:
+        style = "success"
+        note = (":unlock: **Next:** click the **:rocket: Deploy to staging?** step "
+                "in the build graph, then click **Continue** to release.")
+    with open(summary_path, "a") as fh:
+        fh.write("\n" + note + "\n")
+    with open(summary_path) as fh:
+        subprocess.run(["buildkite-agent", "annotate", "--style", style, "--context", "api-tests"],
+                       stdin=fh, check=False)
 
 
 if __name__ == "__main__":
