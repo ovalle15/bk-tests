@@ -1,0 +1,1671 @@
+{
+  "uid": "buildkite-ci",
+  "title": "Buildkite CI",
+  "description": "Builds and queue wait from Buildkite's OpenTelemetry integration, plus job phases, failures and CLI overhead from the agent in each job pod.",
+  "tags": [
+    "buildkite",
+    "otel"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "ds_metrics",
+        "label": "Metrics",
+        "type": "datasource",
+        "query": "prometheus",
+        "regex": "/-prom$/",
+        "hide": 0,
+        "refresh": 1,
+        "current": {}
+      },
+      {
+        "name": "ds_logs",
+        "label": "Logs",
+        "type": "datasource",
+        "query": "loki",
+        "regex": "/-logs$/",
+        "hide": 0,
+        "refresh": 1,
+        "current": {}
+      },
+      {
+        "name": "ds_traces",
+        "label": "Traces",
+        "type": "datasource",
+        "query": "tempo",
+        "regex": "/-traces$/",
+        "hide": 0,
+        "refresh": 1,
+        "current": {}
+      },
+      {
+        "name": "pipeline",
+        "label": "Pipeline",
+        "type": "query",
+        "datasource": {
+          "type": "tempo",
+          "uid": "${ds_traces}"
+        },
+        "query": {
+          "label": "buildkite.pipeline",
+          "type": 1,
+          "refId": "pipeline"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "Buildkite dashboards",
+      "type": "dashboards",
+      "tags": [
+        "buildkite"
+      ],
+      "asDropdown": true,
+      "includeVars": true,
+      "keepTime": true
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Builds and queue wait (Buildkite OpenTelemetry integration)",
+      "id": 1,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "type": "text",
+      "title": "",
+      "options": {
+        "mode": "markdown",
+        "content": "From Buildkite's **OpenTelemetry notification service**, which sends build, step and job spans (`buildkite.build`, `buildkite.job` \u2026) from Buildkite itself, for every queue. These panels stay empty until it's enabled under **Organization settings \u2192 Notification Services**. The rows below come from the agent inside each job pod on `kube`."
+      },
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 2
+    },
+    {
+      "type": "stat",
+      "title": "Builds finished",
+      "description": "One `buildkite.build` span per build.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"buildkite.build\" && resource.buildkite.pipeline.slug =~ \"${pipeline:regex}\" } | count_over_time()"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 3
+      },
+      "id": 3
+    },
+    {
+      "type": "stat",
+      "title": "Failed builds",
+      "description": "Builds that finished in the `failed` state.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"buildkite.build\" && span.buildkite.build.state = \"failed\" && resource.buildkite.pipeline.slug =~ \"${pipeline:regex}\" } | count_over_time()"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 3
+      },
+      "id": 4
+    },
+    {
+      "type": "stat",
+      "title": "Avg build duration",
+      "description": "Average length of the `buildkite.build` span.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"buildkite.build\" && resource.buildkite.pipeline.slug =~ \"${pipeline:regex}\" } | avg_over_time(duration)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 1,
+          "noValue": "-"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 3
+      },
+      "id": 5
+    },
+    {
+      "type": "stat",
+      "title": "Avg queue wait",
+      "description": "Time jobs waited to be picked up by an agent (`buildkite.job.wait_time_ms`).",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"buildkite.job\" && resource.buildkite.pipeline.slug =~ \"${pipeline:regex}\" } | avg_over_time(span.buildkite.job.wait_time_ms)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0,
+          "noValue": "-"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 3
+      },
+      "id": 6
+    },
+    {
+      "type": "stat",
+      "title": "p95 queue wait",
+      "description": "95th percentile of job queue wait. Approximate: Tempo buckets values.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"buildkite.job\" && resource.buildkite.pipeline.slug =~ \"${pipeline:regex}\" } | quantile_over_time(span.buildkite.job.wait_time_ms, .95)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0,
+          "noValue": "-"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 3
+      },
+      "id": 7
+    },
+    {
+      "type": "stat",
+      "title": "Retried jobs",
+      "description": "Job attempts that were retries (`buildkite.job.retries_count` > 0).",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"buildkite.job\" && span.buildkite.job.retries_count > 0 && resource.buildkite.pipeline.slug =~ \"${pipeline:regex}\" } | count_over_time()"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 3
+      },
+      "id": 8
+    },
+    {
+      "type": "timeseries",
+      "title": "Builds by state",
+      "description": "Finished builds per interval, by final state.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "range",
+          "query": "{ name = \"buildkite.build\" && resource.buildkite.pipeline.slug =~ \"${pipeline:regex}\" } | count_over_time() by (span.buildkite.build.state)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*span\\.buildkite\\.build\\.state=\"([^\"]+)\".*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 7
+      },
+      "id": 9
+    },
+    {
+      "type": "timeseries",
+      "title": "p95 queue wait by queue",
+      "description": "How long jobs wait for an agent on each queue. On kube this includes the time to start the job pod.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "range",
+          "query": "{ name = \"buildkite.job\" && resource.buildkite.pipeline.slug =~ \"${pipeline:regex}\" } | quantile_over_time(span.buildkite.job.wait_time_ms, .95) by (span.buildkite.agent.queue)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "points",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "pointSize": 6,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*span\\.buildkite\\.agent\\.queue=\"([^\"]+)\".*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 7
+      },
+      "id": 10
+    },
+    {
+      "type": "bargauge",
+      "title": "Average queue wait per step",
+      "description": "Which steps wait longest for an agent.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"buildkite.job\" && resource.buildkite.pipeline.slug =~ \"${pipeline:regex}\" } | avg_over_time(span.buildkite.job.wait_time_ms) by (span.buildkite.step.label)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 2,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "min": 0,
+          "noValue": "no data in range",
+          "displayName": "${__series.name}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 15
+      },
+      "id": 11
+    },
+    {
+      "type": "bargauge",
+      "title": "Retries per step",
+      "description": "Retried attempts per step. Empty means no retries in the range.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"buildkite.job\" && span.buildkite.job.retries_count > 0 && resource.buildkite.pipeline.slug =~ \"${pipeline:regex}\" } | count_over_time() by (span.buildkite.step.label)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "min": 0,
+          "noValue": "no data in range",
+          "displayName": "${__series.name}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 15
+      },
+      "id": 12
+    },
+    {
+      "type": "table",
+      "title": "Recent failed builds",
+      "description": "Click a trace ID to see the whole build: stages, steps, jobs.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "tableType": "spans",
+          "limit": 20,
+          "query": "{ name = \"buildkite.build\" && span.buildkite.build.state = \"failed\" && resource.buildkite.pipeline.slug =~ \"${pipeline:regex}\" } | select(span.buildkite.build.number, span.buildkite.build.branch, span.buildkite.build.source)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 15
+      },
+      "id": 13
+    },
+    {
+      "type": "row",
+      "title": "Inside jobs on kube: overview",
+      "id": 14,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Jobs run",
+      "description": "One `command` span per job.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"command\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | count_over_time()"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 24
+      },
+      "id": 15
+    },
+    {
+      "type": "stat",
+      "title": "Failed jobs",
+      "description": "Jobs whose command span ended with an error status.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"command\" && status = error && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | count_over_time()"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 24
+      },
+      "id": 16
+    },
+    {
+      "type": "stat",
+      "title": "Avg command time",
+      "description": "Average duration of the step's script.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"command\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | avg_over_time(duration)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 2,
+          "noValue": "-"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 24
+      },
+      "id": 17
+    },
+    {
+      "type": "stat",
+      "title": "Avg checkout time",
+      "description": "Average time in checkout (git clone, fetch, checkout, clean).",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"checkout\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | avg_over_time(duration)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 2,
+          "noValue": "-"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 24
+      },
+      "id": 18
+    },
+    {
+      "type": "stat",
+      "title": "Jobs running now",
+      "description": "Jobs agent-stack-k8s considers in flight.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_metrics}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_metrics}"
+          },
+          "expr": "sum(buildkite_deduper_jobs_running)",
+          "legendFormat": "",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 24
+      },
+      "id": 19
+    },
+    {
+      "type": "stat",
+      "title": "Max in flight",
+      "description": "config.max-in-flight on the controller.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_metrics}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_metrics}"
+          },
+          "expr": "max(buildkite_limiter_max_in_flight)",
+          "legendFormat": "",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 24
+      },
+      "id": 20
+    },
+    {
+      "type": "row",
+      "title": "Where job time goes",
+      "id": 21,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "panels": []
+    },
+    {
+      "type": "bargauge",
+      "title": "Average time per job phase",
+      "description": "Average duration of each top-level phase across the selected pipelines and time range.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name =~ \"checkout|environment|pre-command|command|post-command|pre-exit|artifacts\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | avg_over_time(duration) by (name)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "min": 0,
+          "noValue": "no data in range",
+          "displayName": "${__series.name}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 0,
+        "y": 29
+      },
+      "id": 22
+    },
+    {
+      "type": "timeseries",
+      "title": "p95 duration: checkout, git fetch, command",
+      "description": "Tempo buckets durations in powers of two, so p95 values are approximate. Gaps mean no jobs ran.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "range",
+          "query": "{ name =~ \"checkout|git.fetch|command\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | quantile_over_time(duration, .95) by (name)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "points",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "pointSize": 6,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*name=\"([^\"]+)\".*",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "gridPos": {
+        "h": 9,
+        "w": 16,
+        "x": 8,
+        "y": 29
+      },
+      "id": 23
+    },
+    {
+      "type": "bargauge",
+      "title": "Runs per step",
+      "description": "Jobs per step label.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"command\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | count_over_time() by (resource.buildkite.job_label)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "min": 0,
+          "noValue": "no data in range",
+          "displayName": "${__series.name}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 38
+      },
+      "id": 24
+    },
+    {
+      "type": "bargauge",
+      "title": "Average command time per step",
+      "description": "Average script duration per step label.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"command\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | avg_over_time(duration) by (resource.buildkite.job_label)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "min": 0,
+          "noValue": "no data in range",
+          "displayName": "${__series.name}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 38
+      },
+      "id": 25
+    },
+    {
+      "type": "bargauge",
+      "title": "Failures per step",
+      "description": "Failed jobs per step label. Empty means no failures in the range.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name = \"command\" && status = error && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | count_over_time() by (resource.buildkite.job_label)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "min": 0,
+          "noValue": "no data in range",
+          "displayName": "${__series.name}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 38
+      },
+      "id": 26
+    },
+    {
+      "type": "row",
+      "title": "Agent CLI overhead",
+      "id": 27,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 46
+      },
+      "panels": []
+    },
+    {
+      "type": "bargauge",
+      "title": "Total time in agent CLI calls",
+      "description": "Time your scripts spend in buildkite-agent subcommands.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name =~ \"pipeline-upload|annotate|meta-data-.*|artifact-upload|artifacts|artifact-download\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | sum_over_time(duration) by (name)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "min": 0,
+          "noValue": "no data in range",
+          "displayName": "${__series.name}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 47
+      },
+      "id": 28
+    },
+    {
+      "type": "bargauge",
+      "title": "Average time per CLI call",
+      "description": "Average duration of a single call.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "metricsQueryType": "instant",
+          "query": "{ name =~ \"pipeline-upload|annotate|meta-data-.*|artifact-upload|artifacts|artifact-download\" && resource.buildkite.pipeline =~ \"${pipeline:regex}\" } | avg_over_time(duration) by (name)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "min": 0,
+          "noValue": "no data in range",
+          "displayName": "${__series.name}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "sizing": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 47
+      },
+      "id": 29
+    },
+    {
+      "type": "row",
+      "title": "Failures",
+      "id": 30,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 54
+      },
+      "panels": []
+    },
+    {
+      "type": "table",
+      "title": "Recent failed traces",
+      "description": "Click a trace ID to open it, then use 'Logs for this span'.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "${ds_traces}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${ds_traces}"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "tableType": "traces",
+          "limit": 20,
+          "query": "{ status = error && resource.buildkite.pipeline =~ \"${pipeline:regex}\" }"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 55
+      },
+      "id": 31
+    },
+    {
+      "type": "logs",
+      "title": "Error lines in job logs",
+      "description": "",
+      "datasource": {
+        "type": "loki",
+        "uid": "${ds_logs}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${ds_logs}"
+          },
+          "refId": "A",
+          "expr": "{service_name=\"buildkite-agent\"} | buildkite_pipeline_slug=~\"${pipeline:regex}\" |~ \"(?i)(error|failed|not found|denied|exit status [1-9])\"",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "prettifyLogMessage": false
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 55
+      },
+      "id": 32
+    }
+  ]
+}

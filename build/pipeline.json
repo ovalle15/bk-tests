@@ -1,0 +1,73 @@
+{
+  "steps": [
+    {
+      "label": ":satellite: Record Buildkite cluster",
+      "key": "record-cluster",
+      "agents": {
+        "queue": "kube"
+      },
+      "command": "buildkite-agent meta-data set \"dd_tags.buildkite_cluster_id\" \"$BUILDKITE_CLUSTER_ID\"\nbuildkite-agent meta-data get \"dd_tags.buildkite_cluster_id\""
+    },
+    {
+      "label": ":cat: Validate queue routing",
+      "key": "validate-queue-routing",
+      "agents": {
+        "queue": "kube"
+      },
+      "command": "python3 scripts/queue_router.py validate"
+    },
+    {
+      "trigger": "ao-cache",
+      "key": "ao-cache-trigger",
+      "depends_on": [
+        "validate-queue-routing"
+      ],
+      "build": {
+        "branch": "ao-cache",
+        "env": {
+          "QUEUE": "cache"
+        }
+      }
+    },
+    {
+      "label": ":test_tube: unit tests (demo)",
+      "key": "test-unit",
+      "agents": {
+        "queue": "kube"
+      },
+      "env": {
+        "TEST_SUITE": "unit"
+      },
+      "command": "echo \"Demo: running $TEST_SUITE tests\"",
+      "depends_on": [
+        "ao-cache-trigger"
+      ]
+    },
+    {
+      "label": ":test_tube: integration tests (demo)",
+      "key": "test-integration",
+      "agents": {
+        "queue": "kube"
+      },
+      "env": {
+        "TEST_SUITE": "integration"
+      },
+      "command": "echo \"Demo: running $TEST_SUITE tests\"",
+      "depends_on": [
+        "ao-cache-trigger"
+      ]
+    },
+    {
+      "label": ":white_check_mark: Summary",
+      "key": "summary",
+      "agents": {
+        "queue": "kube"
+      },
+      "depends_on": [
+        "test-unit",
+        "test-integration"
+      ],
+      "command": "echo \"All generated demo test steps passed\""
+    }
+  ]
+}
