@@ -46,10 +46,8 @@ class Handler(BaseHTTPRequestHandler):
             if not raw_id.isdigit():
                 return self._send(400, {"error": "note id must be a number"})
             note = find_note(int(raw_id))
-            # DEMO BUG: a missing note should be a 404, not a 200 with null.
-            # Live fix during the demo: return self._send(404, {"error": "note not found"})
             if note is None:
-                return self._send(200, None)
+                return self._send(404, {"error": "note not found"})
             return self._send(200, note)
         return self._send(404, {"error": "not found"})
 

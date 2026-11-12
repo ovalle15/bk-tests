@@ -5,6 +5,8 @@ set -uo pipefail
 REPORT_DIR="demo/reports"
 mkdir -p "$REPORT_DIR"
 export API_PORT="${API_PORT:-8080}"
+# Plain tracebacks: newer Python colorizes them, which shows as escape codes in annotations.
+export PYTHON_COLORS=0 NO_COLOR=1
 
 echo "--- :python: Starting Notes API on port $API_PORT"
 python3 demo/api/server.py > "$REPORT_DIR/server.log" 2>&1 &
