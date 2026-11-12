@@ -1,16 +1,18 @@
 # Buildkite 101 demo: "From Commit to Green Build"
 # Every job runs on the Buildkite hosted macOS queue (Apple silicon, ephemeral).
 
-agents:
-  queue: "macos-medium"
+
 
 steps:
   - label: ":apple: Hosted agent info"
     command: demo/annotations/agent-info.sh
-
+    agents:
+      queue: "macos-lg"
   - label: ":python: Lint"
     key: "lint"
     command: python3 -m py_compile demo/api/server.py demo/tests/test_api.py
+    agents:
+      queue: "macos-medium"
 
   - label: ":test_tube: API tests"
     key: "api-tests"
@@ -22,22 +24,28 @@ steps:
       - python3 demo/api/server.py &
       - sleep 2
       - python3 demo/tests/run.py demo/reports
+    agents:
+      queue: "macos-lg"
     artifact_paths: "demo/reports/*"
 
   - label: ":package: Build"
     key: "build"
     depends_on: "lint"
+    agents:
+      queue: "macos-lg"
     command: tar -czf notes-api.tar.gz demo/api
     artifact_paths: "notes-api.tar.gz"
 
   - block: ":rocket: Deploy to staging?"
     key: "approval"
-    depends_on:
+    depends_on:     
       - "api-tests"
       - "build"
 
   - label: ":rocket: Deploy (staging)"
     depends_on: "approval"
+    agents:
+      queue: "macos-medium"
     concurrency: 1
     concurrency_group: "ao-demo/deploy/staging"
     command:
