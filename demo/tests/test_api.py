@@ -1,6 +1,7 @@
 """API tests for the Notes API. They call the running server over HTTP."""
 import json
 import os
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -21,6 +22,7 @@ def call(method, path, body=None):
 
 class HealthTests(unittest.TestCase):
     def test_health_returns_ok(self):
+        time.sleep(60)  # demo: hold the job for 1 minute
         status, body = call("GET", "/health")
         self.assertEqual(status, 200)
         self.assertEqual(body, {"status": "ok"})
