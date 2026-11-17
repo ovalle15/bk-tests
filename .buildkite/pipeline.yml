@@ -35,6 +35,8 @@ steps:
       queue: "macos-lg"
     command: tar -czf notes-api.tar.gz demo/api
     artifact_paths: "notes-api.tar.gz"
+  
+  - wait: ~
 
   - block: ":rocket: Deploy to staging?"
     key: "approval"
